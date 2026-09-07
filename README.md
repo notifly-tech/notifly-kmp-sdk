@@ -33,16 +33,16 @@ The build uses Kotlin Gradle Plugin `2.2.21` for current Kotlin Multiplatform an
 
 Kotlin/JS uses the stdlib matching the build compiler because the Kotlin/JS compiler requires it. This does not change the Kotlin requirement of the Android/JVM artifact.
 
-## Versioning
+## Versioning and host integration
 
-Host SDKs must depend on an exact tagged version. Moving branches and version ranges are not supported.
+Every host SDK pins an exact KMP tag commit as a git submodule. Moving branches and version ranges are not supported.
 
-## Artifacts
+The KMP release verifies JVM, Kotlin/JS, and Apple outputs, creates an immutable Git tag and GitHub release, and opens submodule-bump pull requests in the Android, iOS, and JavaScript SDK repositories. The attached `NotiflyKMP.xcframework` is a validation artifact; the iOS SDK builds the framework again from its pinned source.
 
-One tag produces three platform-facing artifacts:
+Customer artifacts are produced by the host SDK releases:
 
-- Android/JVM: `com.github.team-michael.notifly-kmp-sdk:kmp:<tag>` through JitPack
-- JavaScript: `notifly-kmp-sdk` through npm
-- iOS: `NotiflyKMP` through Swift Package Manager or CocoaPods
+- Android builds the submodule project and publishes `tech.notifly:notifly-kmp-sdk:<android-sdk-version>` with the Android SDK to Maven Central.
+- iOS builds a static `NotiflyKMP.xcframework` and links it into the final `notifly_sdk.xcframework`.
+- JavaScript builds the Kotlin/JS package locally and inlines it into the final SDK bundles.
 
-The initial prerelease version is `v0.1.0-alpha.1`. These artifacts are internal implementation dependencies of the platform SDKs; application developers should continue to install the platform SDK they already use.
+The KMP repository itself does not publish npm, CocoaPods, or JitPack packages. Application developers continue to install only the platform SDK they already use.

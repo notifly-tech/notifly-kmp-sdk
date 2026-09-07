@@ -1,10 +1,13 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.jvm.tasks.Jar
 
 plugins {
     kotlin("multiplatform")
     id("dev.petuska.npm.publish")
     `maven-publish`
+    signing
 }
 
 group = providers.environmentVariable("GROUP").getOrElse("tech.notifly")
@@ -73,9 +76,75 @@ npmPublish {
                 description = "Shared Kotlin Multiplatform implementation used by the Notifly SDKs"
                 repository {
                     type = "git"
-                    url = "https://github.com/team-michael/notifly-kmp-sdk.git"
+                    url = "https://github.com/notifly-tech/notifly-kmp-sdk.git"
                 }
             }
         }
+    }
+}
+
+val emptyJavadocJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("javadoc")
+}
+
+val centralPublicationNames = setOf("kotlinMultiplatform", "jvm")
+publishing {
+    publications.withType<MavenPublication>().configureEach {
+        if (name in centralPublicationNames) {
+            artifactId = if (name == "kotlinMultiplatform") {
+                "notifly-kmp-sdk"
+            } else {
+                "notifly-kmp-sdk-jvm"
+            }
+            artifact(emptyJavadocJar)
+            pom {
+                name.set("Notifly KMP SDK")
+                description.set("Shared Kotlin Multiplatform implementation used by the Notifly SDKs")
+                url.set("https://github.com/notifly-tech/notifly-kmp-sdk")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                        distribution.set("repo")
+                    }
+                }
+                developers {
+                    developer {
+                        name.set("Notifly")
+                        organization.set("Notifly")
+                        organizationUrl.set("https://notifly.tech")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:https://github.com/notifly-tech/notifly-kmp-sdk.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/notifly-tech/notifly-kmp-sdk.git")
+                    url.set("https://github.com/notifly-tech/notifly-kmp-sdk")
+                    tag.set(providers.environmentVariable("KMP_SOURCE_TAG").getOrElse("HEAD"))
+                }
+                properties.put(
+                    "notifly.kmp.source.commit",
+                    providers.environmentVariable("KMP_SOURCE_COMMIT").getOrElse("unknown"),
+                )
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "centralStaging"
+            url = uri(
+                providers.environmentVariable("CENTRAL_STAGING_REPOSITORY")
+                    .getOrElse(rootProject.layout.buildDirectory.dir("central-staging").get().asFile.toURI().toString()),
+            )
+        }
+    }
+}
+
+val signingKey = providers.environmentVariable("SIGNING_KEY")
+val signingPassword = providers.environmentVariable("SIGNING_PASSWORD")
+if (signingKey.isPresent) {
+    signing {
+        useInMemoryPgpKeys(signingKey.get(), signingPassword.orNull)
+        sign(publishing.publications.matching { it.name in centralPublicationNames })
     }
 }

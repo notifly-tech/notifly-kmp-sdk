@@ -1,4 +1,4 @@
-name: Prerelease
+name: Release
 
 on:
   workflow_dispatch:
@@ -6,11 +6,22 @@ on:
       version:
         description: Version without the v prefix
         required: true
-        default: 0.1.0-alpha.1
+        default: 0.1.0-alpha.3
+      open_android_pr:
+        description: Open an Android SDK submodule-bump PR
+        type: boolean
+        default: true
+      open_ios_pr:
+        description: Open an iOS SDK submodule-bump PR
+        type: boolean
+        default: true
+      open_js_pr:
+        description: Open a JavaScript SDK submodule-bump PR
+        type: boolean
+        default: true
 
 permissions:
   contents: write
-  id-token: write
 
 concurrency:
   group: notifly-kmp-release
@@ -21,10 +32,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: macos-15
     timeout-minutes: 60
-    environment: release
+    outputs:
+      version: ${{ steps.version.outputs.tag }}
     env:
       VERSION: ${{ inputs.version }}
-      COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -43,12 +54,11 @@ jobs:
           node-version: "22"
           package-manager-cache: false
 
-      - name: Upgrade npm
-        run: npm install -g npm@11.5.1
-
       - name: Validate version
+        id: version
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Detect existing release state
         id: release-state
@@ -71,30 +81,6 @@ jobs:
             echo "github_release_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if npm view "notifly-kmp-sdk" name >/dev/null 2>&1; then
-            echo "npm_package_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "npm_package_exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if npm view "notifly-kmp-sdk@$VERSION" version >/dev/null 2>&1; then
-            echo "npm_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "npm_exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if pod trunk info NotiflyKMP 2>/dev/null | scripts/cocoapods-version-exists.rb "$VERSION"; then
-            echo "cocoapods_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "cocoapods_exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Verify npm trusted publishing bootstrap
-        if: steps.release-state.outputs.npm_package_exists != 'true'
-        run: |
-          echo "::error::Publish notifly-kmp-sdk once, then configure this workflow as its npm trusted publisher."
-          exit 1
-
       - name: Test and build
         run: |
           ./gradlew \
@@ -111,10 +97,6 @@ jobs:
           scripts/smoke-maven-local.sh
           node scripts/smoke-js-package.mjs "kmp/build/packages/notifly-kmp-sdk-$VERSION.tgz"
           scripts/smoke-apple-artifacts.sh
-
-      - name: Publish npm prerelease
-        if: steps.release-state.outputs.npm_exists != 'true'
-        run: npm publish "kmp/build/packages/notifly-kmp-sdk-$VERSION.tgz" --provenance --access public --tag next
 
       - name: Prepare release archive and manifests
         id: apple
@@ -144,8 +126,8 @@ jobs:
             scripts/update_release_manifests.rb "$VERSION" "$checksum"
           fi
 
+          printf '%s  %s\n' "$checksum" "$(basename "$archive")" > "$archive.sha256"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
-          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
       - name: Commit versioned manifests
         if: steps.release-state.outputs.tag_exists != 'true'
@@ -165,23 +147,50 @@ jobs:
         run: |
           gh release create "v$VERSION" \
             "${{ steps.apple.outputs.archive }}" \
-            "kmp/build/release/$VERSION/checksum.txt" \
+            "kmp/build/release/$VERSION/NotiflyKMP.xcframework.zip.sha256" \
             --target "$(git rev-parse HEAD)" \
             --prerelease \
             --generate-notes \
             --title "v$VERSION"
 
-      - name: Publish CocoaPods prerelease
-        if: steps.release-state.outputs.cocoapods_exists != 'true'
-        run: pod trunk push NotiflyKMP.podspec --allow-warnings
-
-      - name: Trigger and verify JitPack
+      - name: Restore checksum asset on an existing release
+        if: steps.release-state.outputs.github_release_exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          pom_url="https://jitpack.io/com/github/team-michael/notifly-kmp-sdk/kmp/v$VERSION/kmp-v$VERSION.pom"
-          for attempt in {1..30}; do
-            if curl --fail --location --silent --show-error "$pom_url" --output /tmp/notifly-kmp.pom; then
-              exit 0
-            fi
-            sleep 20
-          done
-          exit 1
+          gh release upload "v$VERSION" \
+            "kmp/build/release/$VERSION/NotiflyKMP.xcframework.zip.sha256" \
+            --clobber
+
+  bump-android:
+    needs: release
+    if: ${{ inputs.open_android_pr }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Android KMP bump
+        env:
+          GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
+          KMP_TAG: ${{ needs.release.outputs.version }}
+        run: gh workflow run bump-kmp-submodule.yml --repo team-michael/notifly-android-sdk --ref main -f kmp_version="$KMP_TAG"
+
+  bump-ios:
+    needs: release
+    if: ${{ inputs.open_ios_pr }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request iOS KMP bump
+        env:
+          GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
+          KMP_TAG: ${{ needs.release.outputs.version }}
+        run: gh workflow run bump-kmp-submodule.yml --repo team-michael/notifly-ios-sdk --ref main -f kmp_version="$KMP_TAG"
+
+  bump-js:
+    needs: release
+    if: ${{ inputs.open_js_pr }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request JavaScript KMP bump
+        env:
+          GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
+          KMP_TAG: ${{ needs.release.outputs.version }}
+        run: gh workflow run bump-kmp-submodule.yml --repo team-michael/notifly-js-sdk --ref main -f kmp_version="$KMP_TAG"
