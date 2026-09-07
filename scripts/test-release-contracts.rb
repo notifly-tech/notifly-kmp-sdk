@@ -11,6 +11,7 @@ end
 workflow = File.read(File.join(root, ".github/workflows/release.yml"))
 config = YAML.safe_load(workflow, aliases: true)
 jobs = config.fetch("jobs")
+preflight = jobs.fetch("preflight")
 release = jobs.fetch("release")
 steps = release.fetch("steps")
 step_names = steps.map { |step| step["name"] }.compact
@@ -38,6 +39,8 @@ assert_contract(!File.exist?(File.join(root, "jitpack.yml")), "KMP source reposi
 permissions = config.fetch("permissions")
 assert_contract(permissions["contents"] == "write", "release workflow must create tags and releases")
 assert_contract(!permissions.key?("id-token"), "KMP source release no longer needs npm OIDC")
+assert_contract(release["needs"] == "preflight", "release must validate cross-repository dispatch credentials first")
+assert_contract(preflight.to_s.include?("${{ secrets.SDK_REPO_TOKEN }}"), "preflight must validate the SDK dispatch token")
 
 {
   "bump-android" => "team-michael/notifly-android-sdk",
