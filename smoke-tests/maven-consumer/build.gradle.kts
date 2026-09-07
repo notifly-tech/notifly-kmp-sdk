@@ -14,7 +14,7 @@ java {
 
 dependencies {
     val notiflyKmpVersion = providers.environmentVariable("VERSION").getOrElse("0.1.0-alpha.1")
-    implementation("tech.notifly:kmp:$notiflyKmpVersion")
+    implementation("tech.notifly:notifly-kmp-sdk:$notiflyKmpVersion")
 }
 
 application {

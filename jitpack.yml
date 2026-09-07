@@ -1,5 +1,0 @@
-jdk:
-  - openjdk17
-
-install:
-  - ./gradlew :kmp:jvmTest :kmp:publishJvmPublicationToMavenLocal :kmp:publishKotlinMultiplatformPublicationToMavenLocal --no-daemon

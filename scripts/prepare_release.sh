@@ -12,6 +12,7 @@ root_dir="$(cd "$(dirname "$0")/.." && pwd)"
 framework_dir="$root_dir/kmp/build/XCFrameworks/release/NotiflyKMP.xcframework"
 release_dir="$root_dir/kmp/build/release/$version"
 archive_path="$release_dir/NotiflyKMP.xcframework.zip"
+checksum_path="$archive_path.sha256"
 stage_dir="$release_dir/archive-root"
 
 if [[ "${SKIP_BUILD:-false}" != "true" ]]; then
@@ -40,6 +41,6 @@ find "$stage_dir" -exec touch -t 198001010000 {} +
 find "$stage_dir" -depth -delete
 
 checksum="$(swift package compute-checksum "$archive_path")"
-printf '%s\n' "$checksum" > "$release_dir/checksum.txt"
+printf '%s  %s\n' "$checksum" "$(basename "$archive_path")" > "$checksum_path"
 printf '%s\n' "$archive_path"
 printf '%s\n' "$checksum"
