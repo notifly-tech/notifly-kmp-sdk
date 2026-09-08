@@ -3,7 +3,7 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"
-framework_dir="$root_dir/kmp/build/XCFrameworks/release/NotiflyKMP.xcframework"
+framework_dir="$root_dir/build/XCFrameworks/release/NotiflyKMP.xcframework"
 stage_dir="$(mktemp -d "${TMPDIR:-/tmp}/notifly-kmp-pod-lint.XXXXXX")"
 trap 'find "$stage_dir" -depth -delete' EXIT
 

@@ -32,24 +32,24 @@ jobs:
       - name: Test common code
         run: |
           ./gradlew \
-            :kmp:jvmTest \
-            :kmp:jsNodeTest \
-            :kmp:iosSimulatorArm64Test \
+            jvmTest \
+            jsNodeTest \
+            iosSimulatorArm64Test \
             --no-daemon
 
       - name: Build artifacts
         run: |
           ./gradlew \
-            :kmp:publishToMavenLocal \
-            :kmp:packJsPackage \
-            :kmp:assembleNotiflyKMPReleaseXCFramework \
+            publishToMavenLocal \
+            packJsPackage \
+            assembleNotiflyKMPReleaseXCFramework \
             --no-daemon
 
       - name: Smoke-test Maven artifact
         run: scripts/smoke-maven-local.sh
 
       - name: Smoke-test npm artifact
-        run: node scripts/smoke-js-package.mjs kmp/build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz
+        run: node scripts/smoke-js-package.mjs build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz
 
       - name: Smoke-test Apple artifact
         run: |

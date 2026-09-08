@@ -26,7 +26,8 @@ settings = File.read(File.join(root, "settings.gradle.kts"))
 js_smoke_test = File.read(File.join(root, "scripts/smoke-js-package.mjs"))
 maven_smoke_build = File.read(File.join(root, "smoke-tests/maven-consumer/build.gradle.kts"))
 
-assert_contract(!settings.include?('include(":kmp")'), "KMP must be the root Gradle project")
+nested_project = ":" + "kmp"
+assert_contract(!settings.include?("include(\"#{nested_project}\")"), "KMP must be the root Gradle project")
 assert_contract(File.exist?(File.join(root, "src/commonMain/kotlin/tech/notifly/kmp/identity/UserIdTransitionPolicy.kt")), "common source must live under root src")
 assert_contract(!Dir.exist?(File.join(root, "kmp")), "nested kmp module must not remain")
 

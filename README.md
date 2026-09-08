@@ -23,7 +23,7 @@
 
 | | |
 | --- | --- |
-| Module | `:kmp` |
+| Module | root project |
 | Package | `tech.notifly.kmp` |
 | Targets | JVM, Kotlin/JS IR, iOS device and simulator |
 | Consumers | Notifly Android, iOS, and JavaScript SDKs |
@@ -82,9 +82,9 @@ Run the shared test suite:
 
 ```bash
 ./gradlew \
-  :kmp:jvmTest \
-  :kmp:jsNodeTest \
-  :kmp:iosSimulatorArm64Test \
+  jvmTest \
+  jsNodeTest \
+  iosSimulatorArm64Test \
   --no-daemon
 ```
 
@@ -92,13 +92,13 @@ Build and smoke-test all platform artifacts:
 
 ```bash
 ./gradlew \
-  :kmp:publishToMavenLocal \
-  :kmp:packJsPackage \
-  :kmp:assembleNotiflyKMPReleaseXCFramework \
+  publishToMavenLocal \
+  packJsPackage \
+  assembleNotiflyKMPReleaseXCFramework \
   --no-daemon
 
 scripts/smoke-maven-local.sh
-node scripts/smoke-js-package.mjs kmp/build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz
+node scripts/smoke-js-package.mjs build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz
 scripts/smoke-apple-artifacts.sh
 ```
 
@@ -122,7 +122,7 @@ The attached `NotiflyKMP.xcframework` is a validation artifact. The iOS SDK rebu
 
 ```text
 .
-├── kmp/          # Shared Kotlin Multiplatform module
+├── src/          # Shared Kotlin Multiplatform sources
 ├── scripts/      # Release preparation and smoke tests
 ├── smoke-tests/  # Consumer-level verification projects
 └── .github/      # CI and release workflows
