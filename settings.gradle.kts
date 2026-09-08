@@ -14,5 +14,3 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "notifly-kmp-sdk"
-
-include(":kmp")
