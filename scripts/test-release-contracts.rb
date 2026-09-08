@@ -31,6 +31,17 @@ assert_contract(!settings.include?("include(\"#{nested_project}\")"), "KMP must 
 assert_contract(File.exist?(File.join(root, "src/commonMain/kotlin/tech/notifly/kmp/identity/UserIdTransitionPolicy.kt")), "common source must live under root src")
 assert_contract(!Dir.exist?(File.join(root, "kmp")), "nested kmp module must not remain")
 
+{
+  "MAVEN_ROOT_ARTIFACT_ID" => "notifly-kmp-sdk",
+  "MAVEN_JVM_ARTIFACT_ID" => "notifly-kmp-sdk-jvm",
+  "NPM_PACKAGE_NAME" => "notifly-kmp-sdk",
+  "APPLE_FRAMEWORK_NAME" => "NotiflyKMP",
+  "APPLE_FRAMEWORK_IS_STATIC" => "true",
+}.each do |environment_name, default_value|
+  assert_contract(gradle_build.include?(environment_name), "Gradle build must accept #{environment_name}")
+  assert_contract(gradle_build.include?(default_value), "#{environment_name} must retain default #{default_value}")
+end
+
 assert_contract(workflow.include?("ref: main"), "release checkout must be pinned to main")
 assert_contract(workflow.include?("id: release-state"), "release workflow must detect existing GitHub releases")
 assert_contract(workflow.include?('gh release view "$tag"'), "GitHub release state must be resumable")
