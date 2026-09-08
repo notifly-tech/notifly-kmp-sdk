@@ -13,6 +13,14 @@ plugins {
 group = providers.environmentVariable("GROUP").getOrElse("tech.notifly")
 version = providers.environmentVariable("VERSION").getOrElse("0.1.0-alpha.1")
 
+val mavenRootArtifactId = providers.environmentVariable("MAVEN_ROOT_ARTIFACT_ID").getOrElse("notifly-kmp-sdk")
+val mavenJvmArtifactId = providers.environmentVariable("MAVEN_JVM_ARTIFACT_ID").getOrElse("notifly-kmp-sdk-jvm")
+val npmPackageName = providers.environmentVariable("NPM_PACKAGE_NAME").getOrElse("notifly-kmp-sdk")
+val appleFrameworkName = providers.environmentVariable("APPLE_FRAMEWORK_NAME").getOrElse("NotiflyKMP")
+val appleFrameworkIsStatic = providers.environmentVariable("APPLE_FRAMEWORK_IS_STATIC")
+    .map(String::toBooleanStrict)
+    .getOrElse(true)
+
 kotlin {
     compilerOptions {
         // Keep published common/JVM metadata consumable by the Notifly Android SDK's Kotlin 1.8.10 compiler.
@@ -28,15 +36,15 @@ kotlin {
         generateTypeScriptDefinitions()
     }
 
-    val xcframework = XCFramework("NotiflyKMP")
+    val xcframework = XCFramework(appleFrameworkName)
     listOf(
         iosArm64(),
         iosSimulatorArm64(),
         iosX64(),
     ).forEach { target ->
         target.binaries.framework {
-            baseName = "NotiflyKMP"
-            isStatic = true
+            baseName = appleFrameworkName
+            isStatic = appleFrameworkIsStatic
             xcframework.add(this)
         }
     }
@@ -64,7 +72,7 @@ kotlin {
 npmPublish {
     packages {
         named("js") {
-            packageName = "notifly-kmp-sdk"
+            packageName = npmPackageName
             version = project.version.toString()
             readme = rootProject.file("README.md")
             files {
@@ -92,9 +100,9 @@ publishing {
     publications.withType<MavenPublication>().configureEach {
         if (name in centralPublicationNames) {
             artifactId = if (name == "kotlinMultiplatform") {
-                "notifly-kmp-sdk"
+                mavenRootArtifactId
             } else {
-                "notifly-kmp-sdk-jvm"
+                mavenJvmArtifactId
             }
             artifact(emptyJavadocJar)
             pom {

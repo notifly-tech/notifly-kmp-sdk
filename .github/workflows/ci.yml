@@ -56,3 +56,6 @@ jobs:
           SKIP_BUILD=true scripts/prepare_release.sh 0.1.0-alpha.1
           swift package dump-package >/dev/null
           scripts/smoke-apple-artifacts.sh
+
+      - name: Smoke-test host-owned Core artifacts
+        run: scripts/smoke-host-packaging.sh
