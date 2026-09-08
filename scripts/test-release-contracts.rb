@@ -21,9 +21,15 @@ wrapper = File.read(File.join(root, "gradle/wrapper/gradle-wrapper.properties"))
 package = File.read(File.join(root, "Package.swift"))
 podspec = File.read(File.join(root, "NotiflyKMP.podspec"))
 updater = File.read(File.join(root, "scripts/update_release_manifests.rb"))
-gradle_build = File.read(File.join(root, "kmp/build.gradle.kts"))
+gradle_build = File.read(File.join(root, "build.gradle.kts"))
+settings = File.read(File.join(root, "settings.gradle.kts"))
 js_smoke_test = File.read(File.join(root, "scripts/smoke-js-package.mjs"))
 maven_smoke_build = File.read(File.join(root, "smoke-tests/maven-consumer/build.gradle.kts"))
+
+nested_project = ":" + "kmp"
+assert_contract(!settings.include?("include(\"#{nested_project}\")"), "KMP must be the root Gradle project")
+assert_contract(File.exist?(File.join(root, "src/commonMain/kotlin/tech/notifly/kmp/identity/UserIdTransitionPolicy.kt")), "common source must live under root src")
+assert_contract(!Dir.exist?(File.join(root, "kmp")), "nested kmp module must not remain")
 
 assert_contract(workflow.include?("ref: main"), "release checkout must be pinned to main")
 assert_contract(workflow.include?("id: release-state"), "release workflow must detect existing GitHub releases")

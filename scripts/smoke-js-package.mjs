@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
-const tarball = resolve(process.argv[2] ?? "kmp/build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz");
+const tarball = resolve(process.argv[2] ?? "build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz");
 assert.ok(existsSync(tarball), `missing npm tarball: ${tarball}`);
 
 const consumer = mkdtempSync(join(tmpdir(), "notifly-kmp-js-smoke-"));

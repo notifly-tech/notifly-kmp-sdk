@@ -9,14 +9,14 @@ fi
 
 version="$1"
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"
-framework_dir="$root_dir/kmp/build/XCFrameworks/release/NotiflyKMP.xcframework"
-release_dir="$root_dir/kmp/build/release/$version"
+framework_dir="$root_dir/build/XCFrameworks/release/NotiflyKMP.xcframework"
+release_dir="$root_dir/build/release/$version"
 archive_path="$release_dir/NotiflyKMP.xcframework.zip"
 checksum_path="$archive_path.sha256"
 stage_dir="$release_dir/archive-root"
 
 if [[ "${SKIP_BUILD:-false}" != "true" ]]; then
-  "$root_dir/gradlew" :kmp:assembleNotiflyKMPReleaseXCFramework --no-daemon
+  "$root_dir/gradlew" assembleNotiflyKMPReleaseXCFramework --no-daemon
 fi
 
 if [[ ! -d "$framework_dir" ]]; then
