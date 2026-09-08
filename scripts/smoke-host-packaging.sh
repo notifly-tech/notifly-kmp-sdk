@@ -19,6 +19,7 @@ NPM_PACKAGE_NAME="$npm_package_name" \
 APPLE_FRAMEWORK_NAME="$apple_framework_name" \
 APPLE_FRAMEWORK_IS_STATIC="false" \
 "$root_dir/gradlew" \
+  clean \
   publishJvmPublicationToMavenLocal \
   packJsPackage \
   assembleNotiflyCoreReleaseXCFramework \
