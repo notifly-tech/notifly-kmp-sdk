@@ -33,7 +33,7 @@ jobs:
     env:
       SDK_REPO_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
     steps:
-      - name: Validate cross-repository dispatch credentials
+      - name: Validate cross-repository PR credentials
         env:
           OPEN_ANDROID_PR: ${{ inputs.open_android_pr }}
           OPEN_IOS_PR: ${{ inputs.open_ios_pr }}
@@ -41,7 +41,7 @@ jobs:
         run: |
           if [[ "$OPEN_ANDROID_PR" == "true" || "$OPEN_IOS_PR" == "true" || "$OPEN_JS_PR" == "true" ]]; then
             if [[ -z "$SDK_REPO_TOKEN" ]]; then
-              echo "SDK_REPO_TOKEN is required when a platform bump PR is requested." >&2
+              echo "SDK_REPO_TOKEN is required with Contents and Pull requests write access to the platform SDKs." >&2
               exit 1
             fi
           fi
@@ -184,32 +184,29 @@ jobs:
   bump-android:
     needs: release
     if: ${{ inputs.open_android_pr }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Request Android KMP bump
-        env:
-          GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
-          KMP_TAG: ${{ needs.release.outputs.version }}
-        run: gh workflow run bump-kmp-submodule.yml --repo team-michael/notifly-android-sdk --ref main -f kmp_version="$KMP_TAG"
+    uses: ./.github/workflows/bump-sdk-submodule.yml
+    with:
+      sdk_repository: team-michael/notifly-android-sdk
+      kmp_version: ${{ needs.release.outputs.version }}
+    secrets:
+      SDK_REPO_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
 
   bump-ios:
     needs: release
     if: ${{ inputs.open_ios_pr }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Request iOS KMP bump
-        env:
-          GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
-          KMP_TAG: ${{ needs.release.outputs.version }}
-        run: gh workflow run bump-kmp-submodule.yml --repo team-michael/notifly-ios-sdk --ref main -f kmp_version="$KMP_TAG"
+    uses: ./.github/workflows/bump-sdk-submodule.yml
+    with:
+      sdk_repository: team-michael/notifly-ios-sdk
+      kmp_version: ${{ needs.release.outputs.version }}
+    secrets:
+      SDK_REPO_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
 
   bump-js:
     needs: release
     if: ${{ inputs.open_js_pr }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Request JavaScript KMP bump
-        env:
-          GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
-          KMP_TAG: ${{ needs.release.outputs.version }}
-        run: gh workflow run bump-kmp-submodule.yml --repo team-michael/notifly-js-sdk --ref main -f kmp_version="$KMP_TAG"
+    uses: ./.github/workflows/bump-sdk-submodule.yml
+    with:
+      sdk_repository: team-michael/notifly-js-sdk
+      kmp_version: ${{ needs.release.outputs.version }}
+    secrets:
+      SDK_REPO_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}

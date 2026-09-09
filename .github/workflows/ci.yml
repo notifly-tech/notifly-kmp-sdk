@@ -29,6 +29,9 @@ jobs:
       - name: Verify release contracts
         run: ruby scripts/test-release-contracts.rb
 
+      - name: Verify SDK submodule update workflow
+        run: ruby scripts/test-sdk-bump-workflow.rb
+
       - name: Test common code
         run: |
           ./gradlew \
