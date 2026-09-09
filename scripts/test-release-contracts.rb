@@ -56,8 +56,8 @@ assert_contract(!File.exist?(File.join(root, "jitpack.yml")), "KMP source reposi
 permissions = config.fetch("permissions")
 assert_contract(permissions["contents"] == "write", "release workflow must create tags and releases")
 assert_contract(!permissions.key?("id-token"), "KMP source release no longer needs npm OIDC")
-assert_contract(release["needs"] == "preflight", "release must validate cross-repository dispatch credentials first")
-assert_contract(preflight.to_s.include?("${{ secrets.SDK_REPO_TOKEN }}"), "preflight must validate the SDK dispatch token")
+assert_contract(release["needs"] == "preflight", "release must validate cross-repository PR credentials first")
+assert_contract(preflight.to_s.include?("${{ secrets.SDK_REPO_TOKEN }}"), "preflight must validate the SDK PR token")
 
 {
   "bump-android" => "team-michael/notifly-android-sdk",
@@ -66,10 +66,12 @@ assert_contract(preflight.to_s.include?("${{ secrets.SDK_REPO_TOKEN }}"), "prefl
 }.each do |job_name, repository|
   job = jobs.fetch(job_name)
   assert_contract(job["needs"] == "release", "#{job_name} must wait for the KMP release")
-  job_text = job.to_s
-  assert_contract(job_text.include?("gh workflow run bump-kmp-submodule.yml"), "#{job_name} must dispatch its SDK-owned workflow")
-  assert_contract(job_text.include?(repository), "#{job_name} must target the correct SDK repository")
-  assert_contract(job_text.include?("${{ secrets.SDK_REPO_TOKEN }}"), "#{job_name} must use the cross-repository dispatch token")
+  assert_contract(job["uses"] == "./.github/workflows/bump-sdk-submodule.yml", "#{job_name} must create PRs within the KMP repository")
+  assert_contract(job.dig("with", "sdk_repository") == repository, "#{job_name} must target the correct SDK repository")
+  assert_contract(job.dig("with", "kmp_version") == "${{ needs.release.outputs.version }}", "#{job_name} must use the released KMP tag")
+  assert_contract(job.dig("secrets", "SDK_REPO_TOKEN") == "${{ secrets.SDK_REPO_TOKEN }}", "#{job_name} must use the KMP-owned PR token")
+  platform = job_name.delete_prefix("bump-")
+  assert_contract(job["if"] == "${{ inputs.open_#{platform}_pr }}", "#{job_name} must preserve the release opt-in")
 end
 
 assert_contract(step_names.include?("Test and build"), "release must test every KMP target")
