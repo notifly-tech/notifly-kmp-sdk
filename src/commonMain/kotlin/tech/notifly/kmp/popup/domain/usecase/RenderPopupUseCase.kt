@@ -18,7 +18,16 @@ internal class RenderPopupUseCase(private val projectId: String, private val sdk
         val device = request.deviceId?.trimJsWhitespace()
         val campaign = request.campaignId?.trimJsWhitespace()
         val event = request.eventName
-        if (user == null || user.length !in 1..255 || device == null || device.length !in 1..255 || campaign == null || campaign.length !in 1..1024 || event == null || event.length !in 1..255 || event.trimJsWhitespace().isEmpty()) {
+        if (
+            user == null || user.length !in 1..255 ||
+            device == null || device.length !in 1..255 ||
+            campaign == null || campaign.length !in 1..1024 ||
+            event == null || event.length !in 1..255 || event.trimJsWhitespace().isEmpty()
+        ) {
+            return PopupRenderResult.Failed("invalid_request")
+        }
+        // URL parsers normalize complete dot segments even when the dots are percent-encoded.
+        if (user == "." || user == ".." || campaign == "." || campaign == "..") {
             return PopupRenderResult.Failed("invalid_request")
         }
         return repository.render(ValidatedPopupRenderRequest(projectId, header, campaign, user, device, event, request.eventParamsJson))

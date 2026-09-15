@@ -52,4 +52,21 @@ class RenderPopupUseCaseTest {
         })
         assertEquals(PopupRenderResult.Skipped, useCase.render(input.copy(notiflyUserId = "\u0085user\u001C")))
     }
+
+    @Test fun permitsDotDeviceIdsAndOtherDotContainingPathIds() = runTest {
+        for (id in listOf("a.b", "...", "a/..", "%2E")) {
+            for (device in listOf(".", "..")) {
+                val useCase = RenderPopupUseCase(project, "sdk", PopupRenderRepository {
+                    assertEquals(id, it.campaignId)
+                    assertEquals(id, it.notiflyUserId)
+                    assertEquals(device, it.deviceId)
+                    PopupRenderResult.Skipped
+                })
+                assertEquals(
+                    PopupRenderResult.Skipped,
+                    useCase.render(input.copy(campaignId = id, notiflyUserId = id, deviceId = device)),
+                )
+            }
+        }
+    }
 }

@@ -37,7 +37,15 @@ class PopupRenderRepositoryImplTest {
     }
 
     @Test fun encodesEachOriginalIdAsOneSegment() = runTest {
-        for ((id, encoded) in listOf("campaign~|~variant" to "campaign~%7C~variant", "a/b%한😀" to "a%2Fb%25%ED%95%9C%F0%9F%98%80", "already%2Fencoded" to "already%252Fencoded")) {
+        for ((id, encoded) in listOf(
+            "campaign~|~variant" to "campaign~%7C~variant",
+            "a/b%한😀" to "a%2Fb%25%ED%95%9C%F0%9F%98%80",
+            "already%2Fencoded" to "already%252Fencoded",
+            "a.b" to "a.b",
+            "..." to "...",
+            "a/.." to "a%2F..",
+            "%2E" to "%252E",
+        )) {
             assertEquals(PopupRenderResult.Skipped, execute(input.copy(campaignId = id, notiflyUserId = id)) {
                 assertEquals("/projects/0123456789abcdef0123456789abcdef/users/$encoded/popup-pages/$encoded", it.url.encodedPath)
                 respond("", HttpStatusCode.NoContent)
@@ -84,6 +92,17 @@ class PopupRenderRepositoryImplTest {
     @Test fun nullParamsBecomesEmptyObject() = runTest {
         assertEquals(PopupRenderResult.Skipped, execute {
             assertEquals("{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":{}}", (it.body as OutgoingContent.ByteArrayContent).bytes().decodeToString())
+            respond("", HttpStatusCode.NoContent)
+        })
+    }
+
+    @Test fun preservesValidDuplicateKeysLargeNumbersAndQuotedTokenText() = runTest {
+        val params = "{\"x\":0,\"x\":{\"big\":9007199254740993,\"exp\":1.2300e+40,\"text\":\"NaN invalid 01\"}}"
+        assertEquals(PopupRenderResult.Skipped, execute(input.copy(eventParamsJson = params)) {
+            assertEquals(
+                "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":{\"x\":{\"big\":9007199254740993,\"exp\":1.2300e+40,\"text\":\"NaN invalid 01\"}}}",
+                (it.body as OutgoingContent.ByteArrayContent).bytes().decodeToString(),
+            )
             respond("", HttpStatusCode.NoContent)
         })
     }

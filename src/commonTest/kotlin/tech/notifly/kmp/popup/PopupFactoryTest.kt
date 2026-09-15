@@ -46,6 +46,72 @@ class PopupFactoryTest {
         renderer.close()
         renderer.close()
     }
+
+    @Test fun malformedValuesHiddenByDuplicateKeysNeverCreateClientOrSendHttp() = runTest {
+        var created = 0
+        var requests = 0
+        val renderer = createPopupRenderer(
+            PopupRendererConfig("0123456789abcdef0123456789abcdef", "https://render.example", "sdk"),
+            {
+                created++
+                HttpClient(MockEngine {
+                    requests++
+                    respond("", HttpStatusCode.NoContent)
+                })
+            },
+            Dispatchers.Default,
+        ) { 0L }
+        try {
+            for (json in listOf(
+                "{\"x\":NaN,\"x\":1}",
+                "{\"x\":01,\"x\":1}",
+                "{\"x\":{\"bad\":NaN},\"x\":{}}",
+            )) {
+                val output = renderer.awaitOutput(
+                    PopupRenderInput("ssr", "campaign", "user", "device", "open", json),
+                )
+                assertEquals("failed", output.outcome, json)
+                assertEquals("invalid_request", output.errorCode, json)
+                assertNull(output.httpStatus)
+            }
+            assertEquals(0, created)
+            assertEquals(0, requests)
+        } finally {
+            renderer.close()
+        }
+    }
+
+    @Test fun dotOnlyPathIdsNeverCreateClientOrSendHttp() = runTest {
+        var created = 0
+        var requests = 0
+        val renderer = createPopupRenderer(
+            PopupRendererConfig("0123456789abcdef0123456789abcdef", "https://render.example", "sdk"),
+            {
+                created++
+                HttpClient(MockEngine {
+                    requests++
+                    respond("", HttpStatusCode.NoContent)
+                })
+            },
+            Dispatchers.Default,
+        ) { 0L }
+        try {
+            for (dot in listOf(".", "..", "\uFEFF .\u00A0", " .. ")) {
+                for ((campaign, user) in listOf(dot to "user", "campaign" to dot)) {
+                    val output = renderer.awaitOutput(
+                        PopupRenderInput("ssr", campaign, user, "device", "open", "{}"),
+                    )
+                    assertEquals("failed", output.outcome, "$campaign / $user")
+                    assertEquals("invalid_request", output.errorCode)
+                    assertNull(output.httpStatus)
+                }
+            }
+            assertEquals(0, created)
+            assertEquals(0, requests)
+        } finally {
+            renderer.close()
+        }
+    }
 }
 
 private suspend fun PopupRenderer.awaitOutput(input: PopupRenderInput): PopupRenderOutput =

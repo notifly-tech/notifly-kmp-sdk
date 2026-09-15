@@ -15,26 +15,9 @@ internal object PopupRenderRequestDto {
     fun encode(request: ValidatedPopupRenderRequest): PopupRequestEncoding {
         val raw = request.eventParamsJson ?: "{}"
         if (raw.encodeToByteArray().size > MAX_BYTES) return PopupRequestEncoding.Invalid("payload_too_large")
-        var inString = false
-        var escaped = false
-        for (char in raw) {
-            if (inString && char < ' ') return PopupRequestEncoding.Invalid("invalid_request")
-            if (escaped) escaped = false
-            else if (inString && char == '\\') escaped = true
-            else if (char == '"') inString = !inString
-        }
+        if (!hasValidPrimitiveTokens(raw)) return PopupRequestEncoding.Invalid("invalid_request")
         val params = try { Json.parseToJsonElement(raw) as? JsonObject } catch (error: Exception) { null }
             ?: return PopupRequestEncoding.Invalid("invalid_request")
-        // The 1.5 parser preserves number literals, but also accepts invalid unquoted primitives.
-        val pending = ArrayDeque<JsonElement>()
-        pending.add(params)
-        while (pending.isNotEmpty()) {
-            when (val value = pending.removeLast()) {
-                is JsonObject -> pending.addAll(value.values)
-                is JsonArray -> pending.addAll(value)
-                is JsonPrimitive -> if (!value.isString && value != JsonNull && value.content != "true" && value.content != "false" && !number.matches(value.content)) return PopupRequestEncoding.Invalid("invalid_request")
-            }
-        }
         val body = buildJsonObject {
             put("deviceId", request.deviceId)
             put("eventName", request.eventName)
@@ -43,4 +26,32 @@ internal object PopupRenderRequestDto {
         if (body.encodeToByteArray().size > MAX_BYTES) return PopupRequestEncoding.Invalid("payload_too_large")
         return PopupRequestEncoding.Body(body)
     }
+
+    // Validate every original token before JsonObject can overwrite duplicate keys.
+    // The serialization parser still owns JSON structure, keys, and escape syntax.
+    private fun hasValidPrimitiveTokens(raw: String): Boolean {
+        var inString = false
+        var escaped = false
+        var tokenStart = -1
+        for ((index, char) in raw.withIndex()) {
+            if (inString) {
+                if (char < ' ') return false
+                if (escaped) escaped = false
+                else if (char == '\\') escaped = true
+                else if (char == '"') inString = false
+            } else if (char == '"' || char in "{}[]:, \t\r\n") {
+                if (tokenStart >= 0) {
+                    if (!isValidPrimitive(raw.substring(tokenStart, index))) return false
+                    tokenStart = -1
+                }
+                if (char == '"') inString = true
+            } else if (tokenStart < 0) {
+                tokenStart = index
+            }
+        }
+        return tokenStart < 0 || isValidPrimitive(raw.substring(tokenStart))
+    }
+
+    private fun isValidPrimitive(token: String): Boolean =
+        token == "true" || token == "false" || token == "null" || number.matches(token)
 }
