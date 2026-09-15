@@ -52,10 +52,14 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api("org.jetbrains.kotlin:kotlin-stdlib-common:1.8.10")
+            implementation("io.ktor:ktor-client-core:2.3.13")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
         }
 
         jvmMain.dependencies {
             api("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
+            implementation("io.ktor:ktor-client-okhttp:2.3.13")
         }
 
         jsMain.dependencies {
@@ -63,8 +67,18 @@ kotlin {
             api(kotlin("stdlib-js"))
         }
 
+        iosMain.dependencies {
+            implementation("io.ktor:ktor-client-darwin:2.3.13")
+        }
+
+        jvmTest.dependencies {
+            implementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.1")
+            implementation("io.ktor:ktor-client-mock:2.3.13")
         }
     }
 }
