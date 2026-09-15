@@ -47,8 +47,8 @@ device_record="$(
 IFS=$'\t' read -r device_id device_state <<< "$device_record"
 if [[ "$device_state" != "Booted" ]]; then
   xcrun simctl boot "$device_id"
-  xcrun simctl bootstatus "$device_id" -b
   booted_by_smoke=true
+  xcrun simctl bootstatus "$device_id" -b
 fi
 
 xcrun simctl spawn "$device_id" "$stage_dir/notifly-kmp-swift-smoke"
