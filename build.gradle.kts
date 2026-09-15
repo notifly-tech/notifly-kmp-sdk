@@ -31,7 +31,18 @@ kotlin {
     jvm()
 
     js(IR) {
-        nodejs()
+        nodejs {
+            testTask {
+                filter.excludeTestsMatching("*BrowserHttpIntegrationTest*")
+            }
+        }
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
         binaries.library()
         generateTypeScriptDefinitions()
     }

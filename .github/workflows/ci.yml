@@ -40,6 +40,13 @@ jobs:
             iosSimulatorArm64Test \
             --no-daemon
 
+      - name: Test browser HTTP boundary
+        run: |
+          ./gradlew \
+            jsBrowserTest \
+            --tests '*BrowserHttpIntegrationTest*' \
+            --no-daemon
+
       - name: Build artifacts
         run: |
           ./gradlew \
