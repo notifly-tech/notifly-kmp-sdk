@@ -1,10 +1,11 @@
 package tech.notifly.kmp.popup.domain.usecase
 
+import tech.notifly.kmp.core.util.isJsBlank
+import tech.notifly.kmp.core.util.trimJsWhitespace
 import tech.notifly.kmp.popup.domain.model.PopupRenderRequest
 import tech.notifly.kmp.popup.domain.model.PopupRenderResult
 import tech.notifly.kmp.popup.domain.model.PopupRenderingMode
 import tech.notifly.kmp.popup.domain.model.ValidatedPopupRenderRequest
-import tech.notifly.kmp.popup.domain.model.trimJsWhitespace
 import tech.notifly.kmp.popup.domain.repository.PopupRenderRepository
 
 internal class RenderPopupUseCase(
@@ -39,7 +40,7 @@ internal class RenderPopupUseCase(
             user == null || user.length !in 1..255 ||
             device == null || device.length !in 1..255 ||
             campaign == null || campaign.length !in 1..1024 ||
-            event == null || event.length !in 1..255 || event.trimJsWhitespace().isEmpty()
+            event == null || event.length !in 1..255 || event.isJsBlank()
         ) {
             return PopupRenderResult.Failed("invalid_request")
         }

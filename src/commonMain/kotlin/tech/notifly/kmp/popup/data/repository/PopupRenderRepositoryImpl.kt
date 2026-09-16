@@ -17,11 +17,12 @@ import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.http.encodedPath
 import kotlinx.coroutines.CancellationException
+import tech.notifly.kmp.core.networking.encodePathSegment
+import tech.notifly.kmp.core.util.isJsBlank
 import tech.notifly.kmp.popup.data.model.PopupRenderRequestDto
 import tech.notifly.kmp.popup.data.model.PopupRequestEncoding
 import tech.notifly.kmp.popup.domain.model.PopupRenderResult
 import tech.notifly.kmp.popup.domain.model.ValidatedPopupRenderRequest
-import tech.notifly.kmp.popup.domain.model.trimJsWhitespace
 import tech.notifly.kmp.popup.domain.repository.PopupRenderRepository
 
 internal class PopupRenderRepositoryImpl(
@@ -38,9 +39,9 @@ internal class PopupRenderRepositoryImpl(
                 URLBuilder(origin)
                     .apply {
                         encodedPath =
-                            "/projects/${segment(
-                                request.projectId,
-                            )}/users/${segment(request.notiflyUserId)}/popup-pages/${segment(request.campaignId)}"
+                            "/projects/${encodePathSegment(request.projectId)}" +
+                            "/users/${encodePathSegment(request.notiflyUserId)}" +
+                            "/popup-pages/${encodePathSegment(request.campaignId)}"
                     }.build()
             client()
                 .preparePost(endpoint) {
@@ -54,7 +55,7 @@ internal class PopupRenderRepositoryImpl(
                             val html = response.bodyAsText()
                             val type = response.headers[HttpHeaders.ContentType]?.substringBefore(';')?.trim()
                             if (!type.equals("text/html", ignoreCase = true) ||
-                                html.trimJsWhitespace().isEmpty()
+                                html.isJsBlank()
                             ) {
                                 PopupRenderResult.Failed("invalid_response", 200)
                             } else {
@@ -113,20 +114,4 @@ internal class PopupRenderRepositoryImpl(
             null
         }
     }
-
-    /** Encodes an original identifier as one UTF-8 path segment without interpreting existing escapes. */
-    private fun segment(value: String): String =
-        buildString {
-            for (byte in value.encodeToByteArray()) {
-                val code = byte.toInt() and 255
-                val char = code.toChar()
-                if (char in 'a'..'z' || char in 'A'..'Z' || char in '0'..'9' || char in "-._~") {
-                    append(char)
-                } else {
-                    append('%')
-                    append("0123456789ABCDEF"[code ushr 4])
-                    append("0123456789ABCDEF"[code and 15])
-                }
-            }
-        }
 }
