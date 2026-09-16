@@ -1,4 +1,4 @@
-package tech.notifly.kmp.popup.internal
+package tech.notifly.kmp.core.concurrency
 
 internal actual class PlatformLock {
     private val monitor = Any()

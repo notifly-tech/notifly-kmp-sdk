@@ -2,7 +2,7 @@
 
 package tech.notifly.kmp.popup
 
-import tech.notifly.kmp.popup.internal.PlatformLock
+import tech.notifly.kmp.core.concurrency.PlatformLock
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 

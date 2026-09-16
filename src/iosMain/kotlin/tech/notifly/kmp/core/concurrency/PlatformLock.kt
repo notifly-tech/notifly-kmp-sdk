@@ -1,4 +1,4 @@
-package tech.notifly.kmp.popup.internal
+package tech.notifly.kmp.core.concurrency
 
 import platform.Foundation.NSRecursiveLock
 

@@ -8,6 +8,84 @@ This file defines repository conventions for coding agents.
 - Non-English text is allowed only when required as test data, such as Unicode, encoding, or localization fixtures. Preserve those fixtures instead of translating them.
 - This rule applies to repository content, not the language of conversations with the user.
 
+## Structure and architecture
+
+### Module and source sets
+
+- This repository contains one Kotlin Multiplatform library module. Architectural boundaries are packages, not separate Gradle modules.
+- The package root is `tech.notifly.kmp`. Group code by feature, with shared infrastructure under `core`.
+- Keep shared domain behavior in `src/commonMain/kotlin`. Reserve `jvmMain`, `iosMain`, `jsMain`, and other platform source sets for infrastructure required to run that shared implementation.
+- The configured targets are JVM, JavaScript IR for Node.js and browsers, and iOS device/simulator targets. These source sets implement one library; they are not independent SDK applications.
+- Use `expect`/`actual` only where platform capabilities differ, such as HTTP client creation and locking. Keep validation and rendering decisions in shared code.
+
+The main package layout is:
+
+```text
+tech/notifly/kmp/
+  core/
+    concurrency/      Platform-independent locking contract and platform implementations
+    networking/       HTTP client lifecycle, transport configuration, and URL utilities
+    util/             Reusable string, JSON, and platform-specific JS value utilities
+  identity/           Shared user ID transition decisions
+  popup/
+    PopupFactory.kt   Public construction entry point and dependency wiring
+    PopupRenderer.kt  Public callback API and per-request lifecycle
+    PopupRenderTask.kt Public cancellation handle
+    model/            Public configuration, input, and output models
+    domain/
+      model/          Internal requests, validated requests, modes, and results
+      repository/     Repository contracts required by use cases
+      usecase/        Rendering decisions and shared request validation
+    data/
+      model/          HTTP request DTOs and encoding
+      repository/     Repository implementations and HTTP response mapping
+```
+
+This is a package overview across source sets. Platform infrastructure files keep the same package as their shared counterpart: the common `PlatformLock` declaration and all platform implementations belong in `core/concurrency`.
+
+### Platform source-set boundary
+
+- Platform source sets are infrastructure adapters, not separate implementations of each feature. Keep them small and independent of domain concepts wherever possible.
+- Put shared business rules, domain validation, use cases, and feature orchestration in `commonMain`. Put platform-specific product behavior, UI integration, and host SDK lifecycle decisions in the corresponding Android, iOS, or JavaScript SDK repository, not in KMP platform source sets.
+- Limit platform code to capabilities that genuinely require platform APIs, such as HTTP engines, synchronization primitives, and generic native value conversion. Place these capabilities under the appropriate `core` package, even when only one feature currently uses them.
+- Do not grow feature packages, domain-specific factories, use cases, or repository implementations in `jvmMain`, `iosMain`, or `jsMain`. A feature needing a platform capability should use shared logic backed by a narrow infrastructure contract; platform-specific feature decisions belong in the host SDK.
+- Keep unavoidable language/export bridges mechanical and minimal: adapt values and delegate without owning business decisions. Existing compatibility bridges such as `PopupRenderInputJs` are not a precedent for adding domain logic to platform source sets; evaluate shared code or host SDK ownership before extending them.
+- Before adding platform code, identify whether it is shared domain logic, host SDK behavior, or genuinely platform-dependent infrastructure. Do not hide domain dependencies by merely moving feature code into `core` or renaming it as a utility.
+
+### Layer responsibilities and dependencies
+
+- Public entry points live directly under the feature package, and public boundary models live in its `model` package. Keep use cases, repository contracts, implementations, DTOs, and utilities `internal` unless a host SDK genuinely needs them.
+- `PopupFactory` is the composition root: it connects `PopupRenderer`, `RenderPopupUseCase`, and `PopupRenderRepositoryImpl`, supplying the client provider and dispatcher. Host SDKs should not assemble these internal dependencies themselves.
+- `PopupRenderer` adapts public input/output and coordinates completion and cancellation. Rendering rules belong in `RenderPopupUseCase`, not in the facade.
+- `domain` depends on its own models and repository interfaces, and may use pure shared utilities. It must not depend on `data`, Ktor, platform engines, or public facade models.
+- `data` implements the domain repository contract. API requests belong in the repository implementation; serialization belongs in its DTOs. Keep endpoint construction, origin validation, HTTP status mapping, and transport error handling here.
+- `core` provides reusable infrastructure without depending on `popup` or `identity`. It is a package, not a DI container or a separate module.
+- `identity` remains an independent feature that returns user ID transition decisions; the host SDK applies the resulting side effects.
+
+The popup call path is `PopupRenderer -> RenderPopupUseCase -> PopupRenderRepository`. The factory injects `PopupRenderRepositoryImpl`, which implements that interface and uses `core.networking`. This keeps the domain independent of the HTTP implementation.
+
+### Host SDK boundary and lifecycle
+
+- The host SDK supplies the project ID, rendering base URL, full SDK version header, campaign/user/device IDs, and triggering event. Do not hardcode environment selection or read host SDK global state inside KMP.
+- KMP resolves rendering results; the host SDK owns popup eligibility, UI/WebView presentation, the existing static path, and UI-thread dispatch.
+- Preserve the static fast path: only the exact mode `ssr` requests rendering. Other modes return `static` without request validation or network access.
+- Keep the public API usable from Kotlin, Swift, and JavaScript. Do not expose Ktor clients, coroutine types, or serialization internals. Add `@JsExport` to intended JavaScript entry points, not internal helpers.
+- Kotlin and Swift callers construct `PopupRenderInput` with native collections. JavaScript callers use `createPopupRenderInput` to adapt plain objects and arrays. Keep event parameters as structured values at the public boundary, not JSON strings.
+- Renderers borrow one lazily initialized, runtime-shared HTTP client and require no explicit close step. Keep configuration and request state out of the shared client; test-owned clients remain the test's responsibility to close.
+- Cancellation belongs to each `PopupRenderTask`. It must not close the shared client or cancel another request. Do not introduce renderer-wide closed state to manage individual requests.
+- Completion and cancellation compete for one terminal result. Deliver callbacks asynchronously outside the request lock, without promising the main thread, and release request references after completion.
+
+### Placement and extension rules
+
+- Apply the platform source-set boundary above when adding or moving code. Do not duplicate business rules across source sets or use feature-specific platform entry points as a default architecture.
+- Keep generic platform capabilities in `core`; for example, locking belongs in `core/concurrency`, not `popup/internal`.
+- Place reusable, feature-independent helpers in focused files such as `StringUtils.kt`, `JsonUtils.kt`, or `UrlUtils.kt`. Keep popup validation, rendering modes, status mapping, and request lifecycle rules inside `popup`.
+- Follow the feature/package boundaries when adding behavior. Do not introduce `api`/`implementation` module pairs, extra abstraction layers, or generic manager/policy objects solely to mirror a diagram.
+- Mirror production packages in the appropriate test source set. Shared behavior belongs in `commonTest`; platform interop, transport, and concurrency behavior belongs in platform tests.
+- `scripts/` contains release automation and artifact consumer checks, documented in `scripts/README.md`. `smoke-tests/` contains standalone consumer projects that verify the packaged library from outside its module.
+- Keep `karma.config.d/` for browser test configuration loaded by Karma, including the loopback HTTP fixture. It is not a general script directory.
+- Treat `build/` and generated bindings/artifacts as outputs. Update source declarations or build configuration rather than editing generated files.
+
 ## Kotlin style and linting
 
 - Use the pinned ktlint Gradle plugin and engine configured in `build.gradle.kts` and the style rules in `.editorconfig`.

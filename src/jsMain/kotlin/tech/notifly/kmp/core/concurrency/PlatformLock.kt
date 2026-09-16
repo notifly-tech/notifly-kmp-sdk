@@ -1,4 +1,4 @@
-package tech.notifly.kmp.popup.internal
+package tech.notifly.kmp.core.concurrency
 
 /** Runs transitions directly because non-suspending code cannot interleave within one JS runtime. */
 internal actual class PlatformLock {

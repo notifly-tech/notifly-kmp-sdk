@@ -18,6 +18,12 @@
 > [!NOTE]
 > This repository contains shared source code. Each platform SDK builds and distributes its own Core and Full packages. Application developers can install either the Full SDK or the platform's Core package.
 
+## Purpose
+
+This module provides a shared implementation for behavior that should remain consistent across the Notifly SDKs. It reduces duplicated business logic while leaving platform integration and customer-facing SDK ownership with each platform repository.
+
+This README covers the module's purpose, architectural boundaries, and contributor conventions. Keep individual feature descriptions and API usage examples in source-level documentation rather than maintaining a feature catalog here.
+
 ## Architecture
 
 ```mermaid
@@ -39,49 +45,13 @@ flowchart TB
     JS -->|Web| Flutter
 ```
 
-Each platform SDK keeps its existing public API and UI behavior. Shared logic and popup rendering requests live in this repository, with platform-specific HTTP engines behind the common implementation.
+The library is one Gradle module with package-level architectural boundaries:
 
-## Popup rendering
+- `commonMain` owns shared domain logic, validation, and use cases.
+- `jvmMain`, `iosMain`, and `jsMain` provide infrastructure adapters, such as HTTP engines, synchronization, and generic native value conversion. They must not become separate per-platform feature implementations.
+- Each host SDK owns platform-specific product behavior, UI integration, SDK lifecycle decisions, and its customer-facing API.
 
-`PopupFactory.create(config)` creates a reusable renderer. Only the exact mode `ssr`
-calls the injected rendering service; other modes return `static` without reading
-event parameters. The host SDK remains responsible for displaying the result.
-
-Kotlin callers pass `eventParams: Map<String, Any?>?` to `PopupRenderInput`. Swift
-callers pass `[String: Any]` directly, including nested dictionaries, arrays,
-booleans, numbers, and `NSNull()`. Callers no longer serialize event parameters to
-an `eventParamsJson` string.
-
-JavaScript callers use the JS-specific helper so native objects and arrays are
-converted inside KMP:
-
-```javascript
-const popup = sdk.tech.notifly.kmp.popup;
-const renderer = popup.PopupFactory.create(new popup.model.PopupRendererConfig(
-  projectId, renderingBaseUrl, sdkVersion,
-));
-const input = popup.createPopupRenderInput(
-  "ssr", campaignId, notiflyUserId, deviceId, "purchase",
-  { items: [{ id: "P1", quantity: 2 }], enabled: true },
-);
-const task = renderer.render(input, (result) => {
-  // Handle static, rendered, skipped, failed, or cancelled outcomes in the host SDK.
-});
-```
-
-Null or omitted JS parameters become `{}`. Supported values are strings, booleans,
-finite numbers, nulls, lists/JS arrays, and nested string-keyed maps/JS plain objects.
-Unsupported values and circular references produce `invalid_request` without an
-HTTP request. Nested JS `undefined`, functions, symbols, bigint, and class instances
-are unsupported. JS numbers keep JavaScript's existing precision; Swift/Kotlin
-64-bit integers are not rounded through `Double` during encoding. Do not mutate
-Kotlin/Swift input collections while a render is pending.
-
-Renderers reuse one lazily initialized HTTP client for the runtime lifetime and
-require no explicit cleanup. Use `task.cancel()` to cancel an individual render;
-this does not close the shared client or affect other requests. Keep each task
-handle if the host needs to cancel work when a popup is dismissed or the SDK is
-reset. Results are delivered asynchronously, with no main-thread guarantee.
+Group shared code by feature under `tech.notifly.kmp`. Keep reusable infrastructure in `core`, independent of feature packages. Use `expect`/`actual` for platform capabilities, not to split business rules across platforms.
 
 ## Platform integration
 
@@ -97,6 +67,16 @@ The Android, iOS, and JavaScript repositories pin a KMP source commit as a Git s
 
 The iOS repository hosts the Core binary on its own GitHub Releases. Customers do not need to select a separate KMP source version.
 
+## Contributor conventions
+
+- Write repository documentation, comments, identifiers, and test names in English, except for required non-English test fixtures.
+- Keep implementation details internal and public interfaces small and usable from Kotlin, Swift, and JavaScript.
+- Explain contracts above declarations with KDoc. Minimize inline comments and document rationale rather than narrating code.
+- Test observable behavior. Keep shared tests in `commonTest` and platform-specific infrastructure or interop tests in the corresponding platform test source set.
+- Use the pinned ktlint configuration. Review formatting changes and keep unrelated edits out of a change.
+
+See [AGENTS.md](AGENTS.md) for detailed architecture, language, comment, and test conventions, and [scripts/README.md](scripts/README.md) for build and validation tooling.
+
 ## Development
 
 Requirements:
@@ -104,6 +84,7 @@ Requirements:
 - JDK 17
 - Node.js 22
 - macOS with Xcode for Apple targets
+- Chrome for browser tests
 
 Check Kotlin source, tests, and Gradle scripts before committing:
 
@@ -121,8 +102,7 @@ Apply automatic formatting when needed, then rerun the check:
 The ktlint Gradle plugin and engine versions are pinned in `build.gradle.kts`.
 Style settings live in `.editorconfig`. CI and new releases run the check without
 modifying files. Resuming an existing release skips lint so older tags remain
-rebuildable. See [AGENTS.md](AGENTS.md) for English-language, comment, and test
-conventions; semantic conventions still require review.
+rebuildable. Semantic conventions still require review.
 
 Run the shared test suite:
 
@@ -130,6 +110,7 @@ Run the shared test suite:
 ./gradlew \
   jvmTest \
   jsNodeTest \
+  jsBrowserTest \
   iosSimulatorArm64Test \
   --no-daemon
 ```

@@ -9,10 +9,10 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
+import tech.notifly.kmp.core.concurrency.PlatformLock
 import tech.notifly.kmp.popup.domain.model.PopupRenderRequest
 import tech.notifly.kmp.popup.domain.model.PopupRenderResult
 import tech.notifly.kmp.popup.domain.usecase.RenderPopupUseCase
-import tech.notifly.kmp.popup.internal.PlatformLock
 import tech.notifly.kmp.popup.model.PopupRenderInput
 import tech.notifly.kmp.popup.model.PopupRenderOutput
 import kotlin.js.ExperimentalJsExport
