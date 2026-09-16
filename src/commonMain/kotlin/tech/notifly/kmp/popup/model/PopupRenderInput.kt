@@ -12,8 +12,12 @@ import kotlin.js.JsExport
  * values preserve the static path, without validating the remaining fields.
  *
  * SSR requires [campaignId], [notiflyUserId], [deviceId], and a nonblank [eventName]. Identifiers are
- * trimmed using ECMAScript whitespace rules; [eventName] is sent unchanged. [eventParamsJson] must
- * encode a JSON object, with null treated as `{}`. Invalid SSR input produces `invalid_request`.
+ * trimmed using ECMAScript whitespace rules; [eventName] is sent unchanged. [eventParams] supports
+ * strings, booleans, finite numbers, nulls, lists, and nested maps with string keys. Null parameters
+ * are sent as `{}`. Unsupported values or circular collections produce `invalid_request` for SSR.
+ * Do not mutate the supplied collections while a render is pending.
+ *
+ * JavaScript callers should use `createPopupRenderInput` to convert plain objects and arrays.
  */
 @JsExport
 class PopupRenderInput(
@@ -22,5 +26,8 @@ class PopupRenderInput(
     val notiflyUserId: String?,
     val deviceId: String?,
     val eventName: String?,
-    val eventParamsJson: String?,
-)
+    val eventParams: Map<String, Any?>?,
+) {
+    /** Defers JavaScript conversion failures to the normal asynchronous render result. */
+    internal var hasInvalidEventParams: Boolean = false
+}

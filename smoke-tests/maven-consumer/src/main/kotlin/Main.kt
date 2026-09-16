@@ -54,7 +54,7 @@ fun main() {
     val cancelledOrCompleted =
         renderAndAwait(
             cancellableRenderer,
-            PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}"),
+            PopupRenderInput("ssr", "campaign", "user", "device", "open", emptyMap()),
         ) { task ->
             task.cancel()
             task.cancel()

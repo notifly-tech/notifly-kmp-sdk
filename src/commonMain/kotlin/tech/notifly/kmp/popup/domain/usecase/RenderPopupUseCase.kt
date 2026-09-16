@@ -16,7 +16,7 @@ internal class RenderPopupUseCase(
      * Bypasses static requests and validates SSR configuration and identifiers before repository access.
      *
      * Dot-only user and campaign IDs are rejected because URL parsers normalize complete dot segments
-     * even when percent-encoded. Event JSON validation belongs to the repository's encoding boundary.
+     * even when percent-encoded. Event parameter validation belongs to the repository's encoding boundary.
      */
     suspend fun render(request: PopupRenderRequest): PopupRenderResult {
         if (PopupRenderingMode.from(request.templateRenderingMode) ==
@@ -35,6 +35,7 @@ internal class RenderPopupUseCase(
         val campaign = request.campaignId?.trimJsWhitespace()
         val event = request.eventName
         if (
+            request.hasInvalidEventParams ||
             user == null || user.length !in 1..255 ||
             device == null || device.length !in 1..255 ||
             campaign == null || campaign.length !in 1..1024 ||
@@ -46,7 +47,7 @@ internal class RenderPopupUseCase(
             return PopupRenderResult.Failed("invalid_request")
         }
         return repository.render(
-            ValidatedPopupRenderRequest(projectId, header, campaign, user, device, event, request.eventParamsJson),
+            ValidatedPopupRenderRequest(projectId, header, campaign, user, device, event, request.eventParams),
         )
     }
 }

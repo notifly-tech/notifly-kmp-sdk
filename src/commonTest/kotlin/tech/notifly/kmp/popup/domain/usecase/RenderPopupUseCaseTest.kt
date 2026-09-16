@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 
 class RenderPopupUseCaseTest {
     private val project = "0123456789abcdef0123456789abcdef"
-    private val input = PopupRenderRequest("ssr", "campaign", "user", "device", "open", "{}")
+    private val input = PopupRenderRequest("ssr", "campaign", "user", "device", "open", emptyMap())
 
     @Test
     fun nonSsrBypassesAllValidationAndRepository() =
@@ -18,7 +18,7 @@ class RenderPopupUseCaseTest {
             for (mode in listOf(null, "static", "SSR", " ssr", "unknown")) {
                 assertEquals(
                     PopupRenderResult.Static,
-                    useCase.render(PopupRenderRequest(mode, null, null, null, null, "invalid")),
+                    useCase.render(PopupRenderRequest(mode, null, null, null, null, mapOf("bad" to Any()))),
                 )
             }
         }
@@ -69,9 +69,9 @@ class RenderPopupUseCaseTest {
         }
 
     @Test
-    fun normalizesJsWhitespaceIdsButPreservesEventNameAndJson() =
+    fun render_paddedIdentifiers_normalizesIdsAndPreservesEvent() =
         runTest {
-            val json = " {\"big\":9007199254740993} "
+            val params = mapOf("big" to 9007199254740993L)
             val useCase =
                 RenderPopupUseCase(
                     project,
@@ -83,7 +83,7 @@ class RenderPopupUseCaseTest {
                         assertEquals("user", request.notiflyUserId)
                         assertEquals("device", request.deviceId)
                         assertEquals(" open ", request.eventName)
-                        assertEquals(json, request.eventParamsJson)
+                        assertEquals(params, request.eventParams)
                         PopupRenderResult.Rendered("original")
                     },
                 )
@@ -95,7 +95,7 @@ class RenderPopupUseCaseTest {
                         notiflyUserId = "\u2000user\u2029",
                         deviceId = " device ",
                         eventName = " open ",
-                        eventParamsJson = json,
+                        eventParams = params,
                     ),
                 ),
             )

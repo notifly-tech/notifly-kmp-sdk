@@ -50,13 +50,13 @@ class PopupRenderRepositoryImplTest {
     }
 
     @Test
-    fun sendsExactWireContractAndPreservesOriginalHtmlAndNumericLiterals() =
+    fun render_nestedEventParams_preservesWireContractAndOriginalHtml() =
         runTest {
             val html = "  <!doctype html><html>한글</html>\n"
-            val params = "{\"nested\":{\"a\":[true,false,null,\"한글\",9007199254740993,1.2300e+40]}}"
+            val params = mapOf("nested" to mapOf("a" to listOf(true, false, null, "한글", 9007199254740993L, 1.25)))
             assertEquals(
                 PopupRenderResult.Rendered(html),
-                execute(input.copy(campaignId = "UJ~|~journey~|~node~|~session", eventParamsJson = params)) { request ->
+                execute(input.copy(campaignId = "UJ~|~journey~|~node~|~session", eventParams = params)) { request ->
                     assertEquals(HttpMethod.Post, request.method)
                     assertEquals(
                         "/projects/0123456789abcdef0123456789abcdef/users/user/popup-pages/UJ~%7C~journey~%7C~node~%7C~session",
@@ -69,7 +69,7 @@ class PopupRenderRepositoryImplTest {
                     val content = request.body as OutgoingContent.ByteArrayContent
                     assertEquals(ContentType.Application.Json, content.contentType?.withoutParameters())
                     assertEquals(
-                        "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":$params}",
+                        """{"deviceId":"device","eventName":" open ","eventParams":{"nested":{"a":[true,false,null,"한글",9007199254740993,1.25]}}}""",
                         content.bytes().decodeToString(),
                     )
                     respond(html, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "Text/Html; charset=UTF-8"))
@@ -196,34 +196,19 @@ class PopupRenderRepositoryImplTest {
         }
 
     @Test
-    fun rejectsNonObjectAndMalformedJsonBeforeCreatingClient() =
+    fun render_nonJsonValues_rejectsBeforeCreatingClient() =
         runTest {
             val repository = PopupRenderRepositoryImpl("https://render.example") { error("must not create client") }
-            for (json in listOf(
-                "",
-                " ",
-                "null",
-                "[]",
-                "1",
-                "true",
-                "\"str\"",
-                "{",
-                "{\"x\":NaN}",
-                "{\"x\":invalid}",
-                "{\"x\":01}",
-                "{\"x\":+1}",
-                "{\"x\":1.}",
-                "{\"x\":.1}",
-                "{\"x\":Infinity}",
-                "{\"x\":1e}",
-                "{x:1}",
-                "{\"x\":\"raw\nnewline\"}",
-                "{} trailing",
+            for (value in listOf(
+                Any(),
+                Double.NaN,
+                Double.POSITIVE_INFINITY,
+                mapOf(1 to "non-string key"),
             )) {
                 assertEquals(
                     PopupRenderResult.Failed("invalid_request"),
-                    repository.render(input.copy(eventParamsJson = json)),
-                    json,
+                    repository.render(input.copy(eventParams = mapOf("value" to value))),
+                    value.toString(),
                 )
             }
         }
@@ -244,14 +229,14 @@ class PopupRenderRepositoryImplTest {
         }
 
     @Test
-    fun preservesValidDuplicateKeysLargeNumbersAndQuotedTokenText() =
+    fun render_largeIntegerAndTokenLikeText_preservesValues() =
         runTest {
-            val params = "{\"x\":0,\"x\":{\"big\":9007199254740993,\"exp\":1.2300e+40,\"text\":\"NaN invalid 01\"}}"
+            val params = mapOf("x" to mapOf("big" to 9007199254740993L, "text" to "NaN invalid 01"))
             assertEquals(
                 PopupRenderResult.Skipped,
-                execute(input.copy(eventParamsJson = params)) {
+                execute(input.copy(eventParams = params)) {
                     assertEquals(
-                        "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":{\"x\":{\"big\":9007199254740993,\"exp\":1.2300e+40,\"text\":\"NaN invalid 01\"}}}",
+                        "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":{\"x\":{\"big\":9007199254740993,\"text\":\"NaN invalid 01\"}}}",
                         (it.body as OutgoingContent.ByteArrayContent).bytes().decodeToString(),
                     )
                     respond("", HttpStatusCode.NoContent)
@@ -263,12 +248,12 @@ class PopupRenderRepositoryImplTest {
     fun sendsLargeJsonWithoutLocalSizeLimit() =
         runTest {
             for (value in listOf("a".repeat(300000), "한".repeat(100000))) {
-                val params = "{\"x\":\"$value\"}"
+                val params = mapOf("x" to value)
                 assertEquals(
                     PopupRenderResult.Skipped,
-                    execute(input.copy(eventParamsJson = params)) {
+                    execute(input.copy(eventParams = params)) {
                         assertEquals(
-                            "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":$params}",
+                            "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":{\"x\":\"$value\"}}",
                             (it.body as OutgoingContent.ByteArrayContent).bytes().decodeToString(),
                         )
                         respond("", HttpStatusCode.NoContent)
@@ -281,7 +266,7 @@ class PopupRenderRepositoryImplTest {
     @Test
     fun serializedBodyCanExceedFormerSizeLimit() =
         runTest {
-            val base = input.copy(eventName = "open", eventParamsJson = "{\"x\":\"" + "a".repeat(262082) + "\"}")
+            val base = input.copy(eventName = "open", eventParams = mapOf("x" to "a".repeat(262082)))
             assertEquals(
                 PopupRenderResult.Skipped,
                 execute(base) {
@@ -292,13 +277,13 @@ class PopupRenderRepositoryImplTest {
         }
 
     @Test
-    fun rejectsLargeMalformedJsonBeforeCreatingClient() =
+    fun render_largeParamsWithNonFiniteNumber_rejectsBeforeCreatingClient() =
         runTest {
             val repository = PopupRenderRepositoryImpl("https://render.example") { error("must not create client") }
-            val params = "{\"x\":" + " ".repeat(300000) + "NaN}"
+            val params = mapOf("text" to " ".repeat(300000), "value" to Double.NaN)
             assertEquals(
                 PopupRenderResult.Failed("invalid_request"),
-                repository.render(input.copy(eventParamsJson = params)),
+                repository.render(input.copy(eventParams = params)),
             )
         }
 

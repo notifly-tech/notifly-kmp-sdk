@@ -135,7 +135,7 @@ class BrowserFetchEngineTest {
                     "user",
                     "device",
                     "open",
-                    "{}",
+                    emptyMap(),
                 )
             for (duringBody in listOf(false, true)) {
                 val client =

@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { runInNewContext } from "node:vm";
 
 const tarball = resolve(process.argv[2] ?? "build/packages/notifly-kmp-sdk-0.1.0-alpha.1.tgz");
 assert.ok(existsSync(tarball), `missing npm tarball: ${tarball}`);
@@ -70,7 +71,7 @@ try {
   const staticRenderer = popup.PopupFactory.create(new model.PopupRendererConfig("", "not-https", ""));
   const staticOutput = await renderAndAwait(
     staticRenderer,
-    new model.PopupRenderInput("static", null, null, null, null, null),
+    popup.createPopupRenderInput("static", null, null, null, null, null),
   );
   assert.equal(staticOutput.outcome, "static");
   assert.equal(staticOutput.html, null);
@@ -80,7 +81,7 @@ try {
 
   const closedOutput = await renderAndAwait(
     staticRenderer,
-    new model.PopupRenderInput("static", null, null, null, null, null),
+    popup.createPopupRenderInput("static", null, null, null, null, null),
   );
   assert.equal(closedOutput.outcome, "failed");
   assert.equal(closedOutput.errorCode, "renderer_closed");
@@ -88,7 +89,7 @@ try {
   const cancellableRenderer = popup.PopupFactory.create(new model.PopupRendererConfig("", "not-https", ""));
   const cancelledOrCompleted = await renderAndAwait(
     cancellableRenderer,
-    new model.PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}"),
+    popup.createPopupRenderInput("ssr", "campaign", "user", "device", "open", {}),
     (task) => {
       task.cancel();
       task.cancel();
@@ -100,6 +101,59 @@ try {
         cancelledOrCompleted.errorCode === "invalid_configuration"),
   );
   cancellableRenderer.close();
+
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url, body: JSON.parse(new TextDecoder().decode(init.body)) });
+    return new Response("<html>rendered</html>", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  };
+  const renderer = popup.PopupFactory.create(new model.PopupRendererConfig(
+    "0123456789abcdef0123456789abcdef", "https://render.example", "notifly/js/test",
+  ));
+  try {
+    const params = {
+      items: [{ id: "P1", quantity: 2 }],
+      tags: ["sale", "new"],
+      enabled: true,
+      nullable: null,
+      price: 1.25,
+    };
+    const rendered = await renderAndAwait(
+      renderer,
+      popup.createPopupRenderInput("ssr", "campaign", "user", "device", "purchase", params),
+    );
+    assert.equal(rendered.outcome, "rendered");
+    assert.equal(rendered.html, "<html>rendered</html>");
+    assert.deepEqual(requests, [{
+      url: "https://render.example/projects/0123456789abcdef0123456789abcdef/users/user/popup-pages/campaign",
+      body: { deviceId: "device", eventName: "purchase", eventParams: params },
+    }]);
+
+    for (const invalidParams of [[], { value: undefined }, { value: NaN }]) {
+      const failed = await renderAndAwait(
+        renderer,
+        popup.createPopupRenderInput("ssr", "campaign", "user", "device", "purchase", invalidParams),
+      );
+      assert.equal(failed.errorCode, "invalid_request");
+    }
+    assert.equal(requests.length, 1, "invalid parameters must not make HTTP requests");
+
+    const crossRealmParams = runInNewContext("({ items: [{ id: 'P2', quantity: 1 }] })");
+    const crossRealmOutput = await renderAndAwait(
+      renderer,
+      popup.createPopupRenderInput("ssr", "campaign", "user", "device", "purchase", crossRealmParams),
+    );
+    assert.equal(crossRealmOutput.outcome, "rendered");
+    assert.equal(requests.length, 2);
+    assert.deepEqual(requests[1].body.eventParams, { items: [{ id: "P2", quantity: 1 }] });
+  } finally {
+    renderer.close();
+    globalThis.fetch = originalFetch;
+  }
 
   console.log(`verified ${basename(tarball)} from ${dirname(tarball)}`);
 } finally {

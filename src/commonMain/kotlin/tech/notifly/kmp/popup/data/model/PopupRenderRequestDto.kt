@@ -1,7 +1,10 @@
 package tech.notifly.kmp.popup.data.model
 
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import tech.notifly.kmp.popup.domain.model.ValidatedPopupRenderRequest
@@ -17,19 +20,14 @@ internal sealed class PopupRequestEncoding {
 }
 
 internal object PopupRenderRequestDto {
-    private val number = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
-
-    /** Encodes event parameters as a JSON object, using `{}` for null and rejecting malformed input. */
+    /** Encodes supported values without rounding integer values through a floating-point conversion. */
     fun encode(request: ValidatedPopupRenderRequest): PopupRequestEncoding {
-        val raw = request.eventParamsJson ?: "{}"
-        if (!hasValidPrimitiveTokens(raw)) return PopupRequestEncoding.Invalid("invalid_request")
         val params =
             try {
-                Json.parseToJsonElement(raw) as? JsonObject
+                encodeValue(request.eventParams ?: emptyMap<String, Any?>(), mutableListOf())
             } catch (error: Exception) {
-                null
+                return PopupRequestEncoding.Invalid("invalid_request")
             }
-                ?: return PopupRequestEncoding.Invalid("invalid_request")
         val body =
             buildJsonObject {
                 put("deviceId", request.deviceId)
@@ -39,39 +37,62 @@ internal object PopupRenderRequestDto {
         return PopupRequestEncoding.Body(body)
     }
 
-    /**
-     * Checks original primitive tokens before [JsonObject] can overwrite duplicate keys.
-     *
-     * Otherwise, a later valid value could hide an invalid token. The serialization parser still
-     * validates JSON structure, keys, and escape syntax.
-     */
-    private fun hasValidPrimitiveTokens(raw: String): Boolean {
-        var inString = false
-        var escaped = false
-        var tokenStart = -1
-        for ((index, char) in raw.withIndex()) {
-            if (inString) {
-                if (char < ' ') return false
-                if (escaped) {
-                    escaped = false
-                } else if (char == '\\') {
-                    escaped = true
-                } else if (char == '"') {
-                    inString = false
+    private fun encodeValue(
+        value: Any?,
+        ancestors: MutableList<Any>,
+    ): JsonElement =
+        when (value) {
+            null -> {
+                JsonNull
+            }
+
+            is String -> {
+                JsonPrimitive(value)
+            }
+
+            is Boolean -> {
+                JsonPrimitive(value)
+            }
+
+            is Number -> {
+                require(value.toDouble().isFinite())
+                JsonPrimitive(value)
+            }
+
+            is Map<*, *> -> {
+                encodeCollection(value, ancestors) {
+                    JsonObject(
+                        value.entries.associate { (key, item) ->
+                            require(key is String)
+                            key to encodeValue(item, ancestors)
+                        },
+                    )
                 }
-            } else if (char == '"' || char in "{}[]:, \t\r\n") {
-                if (tokenStart >= 0) {
-                    if (!isValidPrimitive(raw.substring(tokenStart, index))) return false
-                    tokenStart = -1
+            }
+
+            is List<*> -> {
+                encodeCollection(value, ancestors) {
+                    JsonArray(value.map { encodeValue(it, ancestors) })
                 }
-                if (char == '"') inString = true
-            } else if (tokenStart < 0) {
-                tokenStart = index
+            }
+
+            else -> {
+                throw IllegalArgumentException("Unsupported event parameter value")
             }
         }
-        return tokenStart < 0 || isValidPrimitive(raw.substring(tokenStart))
-    }
 
-    private fun isValidPrimitive(token: String): Boolean =
-        token == "true" || token == "false" || token == "null" || number.matches(token)
+    /** Tracks only ancestors so shared, non-circular collections can appear more than once. */
+    private inline fun encodeCollection(
+        value: Any,
+        ancestors: MutableList<Any>,
+        encode: () -> JsonElement,
+    ): JsonElement {
+        require(ancestors.none { it === value })
+        ancestors.add(value)
+        return try {
+            encode()
+        } finally {
+            ancestors.removeAt(ancestors.lastIndex)
+        }
+    }
 }

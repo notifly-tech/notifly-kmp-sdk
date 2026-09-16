@@ -69,7 +69,8 @@ class PopupRenderer internal constructor(
                                             input.notiflyUserId,
                                             input.deviceId,
                                             input.eventName,
-                                            input.eventParamsJson,
+                                            input.eventParams,
+                                            input.hasInvalidEventParams,
                                         ),
                                     )
                                 } catch (error: CancellationException) {

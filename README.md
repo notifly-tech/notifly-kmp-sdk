@@ -43,7 +43,7 @@ flowchart LR
     KMP --> JS
 ```
 
-Each platform SDK keeps its existing public API and platform-specific behavior. Only deterministic, platform-independent logic belongs in this repository.
+Each platform SDK keeps its existing public API and UI behavior. Shared logic and popup rendering requests live in this repository, with platform-specific HTTP engines behind the common implementation.
 
 ## Current scope
 
@@ -59,6 +59,45 @@ decision.shouldSync  // true
 decision.shouldMerge // true
 decision.shouldClear // false
 ```
+
+### Popup rendering
+
+`PopupFactory.create(config)` creates a reusable renderer. Only the exact mode `ssr`
+calls the injected rendering service; other modes return `static` without reading
+event parameters. The host SDK remains responsible for displaying the result.
+
+Kotlin callers pass `eventParams: Map<String, Any?>?` to `PopupRenderInput`. Swift
+callers pass `[String: Any]` directly, including nested dictionaries, arrays,
+booleans, numbers, and `NSNull()`. Callers no longer serialize event parameters to
+an `eventParamsJson` string.
+
+JavaScript callers use the JS-specific helper so native objects and arrays are
+converted inside KMP:
+
+```javascript
+const popup = sdk.tech.notifly.kmp.popup;
+const renderer = popup.PopupFactory.create(new popup.model.PopupRendererConfig(
+  projectId, renderingBaseUrl, sdkVersion,
+));
+const input = popup.createPopupRenderInput(
+  "ssr", campaignId, notiflyUserId, deviceId, "purchase",
+  { items: [{ id: "P1", quantity: 2 }], enabled: true },
+);
+const task = renderer.render(input, (result) => {
+  // Handle static, rendered, skipped, failed, or cancelled outcomes in the host SDK.
+});
+```
+
+Null or omitted JS parameters become `{}`. Supported values are strings, booleans,
+finite numbers, nulls, lists/JS arrays, and nested string-keyed maps/JS plain objects.
+Unsupported values and circular references produce `invalid_request` without an
+HTTP request. Nested JS `undefined`, functions, symbols, bigint, and class instances
+are unsupported. JS numbers keep JavaScript's existing precision; Swift/Kotlin
+64-bit integers are not rounded through `Double` during encoding. Do not mutate
+Kotlin/Swift input collections while a render is pending.
+
+Use `task.cancel()` to cancel one render and `renderer.close()` when releasing the
+owning SDK. Results are delivered asynchronously, with no main-thread guarantee.
 
 ## Platform integration
 

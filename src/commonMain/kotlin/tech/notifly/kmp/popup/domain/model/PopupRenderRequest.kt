@@ -6,7 +6,8 @@ internal data class PopupRenderRequest(
     val notiflyUserId: String?,
     val deviceId: String?,
     val eventName: String?,
-    val eventParamsJson: String?,
+    val eventParams: Map<String, Any?>?,
+    val hasInvalidEventParams: Boolean = false,
 )
 
 internal data class ValidatedPopupRenderRequest(
@@ -16,5 +17,5 @@ internal data class ValidatedPopupRenderRequest(
     val notiflyUserId: String,
     val deviceId: String,
     val eventName: String,
-    val eventParamsJson: String?,
+    val eventParams: Map<String, Any?>?,
 )

@@ -25,7 +25,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PopupRendererTest {
-    private val input = PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}")
+    private val input = PopupRenderInput("ssr", "campaign", "user", "device", "open", emptyMap())
 
     private fun TestScope.renderer(
         close: () -> Unit = {},
@@ -193,7 +193,9 @@ class PopupRendererTest {
         runTest {
             val outcomes = mutableListOf<PopupRenderOutput>()
             val renderer = renderer { PopupRenderResult.Skipped }
-            renderer.render(PopupRenderInput("static", null, null, null, null, "bad")) { outcomes.add(it) }
+            renderer.render(
+                PopupRenderInput("static", null, null, null, null, mapOf("bad" to Any())),
+            ) { outcomes.add(it) }
             renderer.render(PopupRenderInput("ssr", null, null, null, null, null)) { outcomes.add(it) }
             renderer.render(input) { outcomes.add(it) }
             assertTrue(outcomes.isEmpty())

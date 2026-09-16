@@ -57,11 +57,22 @@ class PopupFactoryTest {
                 )
             val outputs = mutableListOf<PopupRenderOutput>()
             assertEquals(0, created)
-            outputs.add(renderer.awaitOutput(PopupRenderInput(null, null, null, null, null, "bad")))
+            outputs.add(renderer.awaitOutput(PopupRenderInput(null, null, null, null, null, mapOf("bad" to Any()))))
             outputs.add(renderer.awaitOutput(PopupRenderInput("ssr", null, null, null, null, null)))
-            outputs.add(renderer.awaitOutput(PopupRenderInput("ssr", "campaign", "user", "device", "open", "[]")))
+            outputs.add(
+                renderer.awaitOutput(
+                    PopupRenderInput(
+                        "ssr",
+                        "campaign",
+                        "user",
+                        "device",
+                        "open",
+                        mapOf("bad" to Any()),
+                    ),
+                ),
+            )
             assertEquals(0, created)
-            val input = PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}")
+            val input = PopupRenderInput("ssr", "campaign", "user", "device", "open", emptyMap())
             outputs.add(renderer.awaitOutput(input))
             outputs.add(renderer.awaitOutput(input))
             assertEquals(1, created)
@@ -87,7 +98,7 @@ class PopupFactoryTest {
                     StandardTestDispatcher(testScheduler),
                 )
             var output: PopupRenderOutput? = null
-            renderer.render(PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}")) { output = it }
+            renderer.render(PopupRenderInput("ssr", "campaign", "user", "device", "open", emptyMap())) { output = it }
             runCurrent()
             assertEquals("invalid_configuration", output?.errorCode)
             renderer.close()
@@ -95,7 +106,7 @@ class PopupFactoryTest {
         }
 
     @Test
-    fun malformedValuesHiddenByDuplicateKeysNeverCreateClientOrSendHttp() =
+    fun render_unsupportedNestedValues_returnsInvalidRequestWithoutCreatingClient() =
         runTest {
             var created = 0
             var requests = 0
@@ -114,17 +125,17 @@ class PopupFactoryTest {
                     Dispatchers.Default,
                 )
             try {
-                for (json in listOf(
-                    "{\"x\":NaN,\"x\":1}",
-                    "{\"x\":01,\"x\":1}",
-                    "{\"x\":{\"bad\":NaN},\"x\":{}}",
+                for (params in listOf(
+                    mapOf("x" to Double.NaN),
+                    mapOf("x" to listOf(Any())),
+                    mapOf("x" to mapOf("bad" to Double.POSITIVE_INFINITY)),
                 )) {
                     val output =
                         renderer.awaitOutput(
-                            PopupRenderInput("ssr", "campaign", "user", "device", "open", json),
+                            PopupRenderInput("ssr", "campaign", "user", "device", "open", params),
                         )
-                    assertEquals("failed", output.outcome, json)
-                    assertEquals("invalid_request", output.errorCode, json)
+                    assertEquals("failed", output.outcome, params.toString())
+                    assertEquals("invalid_request", output.errorCode, params.toString())
                     assertNull(output.httpStatus)
                 }
                 assertEquals(0, created)
@@ -158,7 +169,7 @@ class PopupFactoryTest {
                     for ((campaign, user) in listOf(dot to "user", "campaign" to dot)) {
                         val output =
                             renderer.awaitOutput(
-                                PopupRenderInput("ssr", campaign, user, "device", "open", "{}"),
+                                PopupRenderInput("ssr", campaign, user, "device", "open", emptyMap()),
                             )
                         assertEquals("failed", output.outcome, "$campaign / $user")
                         assertEquals("invalid_request", output.errorCode)

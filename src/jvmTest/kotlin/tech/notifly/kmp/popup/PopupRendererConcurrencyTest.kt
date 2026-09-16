@@ -25,7 +25,8 @@ class PopupRendererConcurrencyTest {
             Dispatchers.Default,
         )
 
-    private fun input(json: String = "{}") = PopupRenderInput("ssr", "campaign", "user", "device", "open", json)
+    private fun input(params: Map<String, Any?> = emptyMap()) =
+        PopupRenderInput("ssr", "campaign", "user", "device", "open", params)
 
     @Test
     fun concurrentCancelCompletionAndCloseDeliverExactlyOnce() =
@@ -91,7 +92,7 @@ class PopupRendererConcurrencyTest {
     private fun completedHandle(): Pair<PopupRenderTask, List<WeakReference<Any>>> =
         runBlocking {
             val html = String(CharArray(100000) { 'h' })
-            val input = input(String(CharArray(100000) { 'e' }))
+            val input = input(mapOf("text" to String(CharArray(100000) { 'e' })))
             val callbackOwner = Any()
             val delivered = CompletableDeferred<Unit>()
             val renderer = renderer { PopupRenderResult.Rendered(html) }
