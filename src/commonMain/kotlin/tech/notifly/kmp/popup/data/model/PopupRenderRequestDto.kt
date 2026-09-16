@@ -9,12 +9,10 @@ internal sealed class PopupRequestEncoding {
 }
 
 internal object PopupRenderRequestDto {
-    private const val MAX_BYTES = 262144
     private val number = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
 
     fun encode(request: ValidatedPopupRenderRequest): PopupRequestEncoding {
         val raw = request.eventParamsJson ?: "{}"
-        if (raw.encodeToByteArray().size > MAX_BYTES) return PopupRequestEncoding.Invalid("payload_too_large")
         if (!hasValidPrimitiveTokens(raw)) return PopupRequestEncoding.Invalid("invalid_request")
         val params = try { Json.parseToJsonElement(raw) as? JsonObject } catch (error: Exception) { null }
             ?: return PopupRequestEncoding.Invalid("invalid_request")
@@ -23,7 +21,6 @@ internal object PopupRenderRequestDto {
             put("eventName", request.eventName)
             put("eventParams", params)
         }.toString()
-        if (body.encodeToByteArray().size > MAX_BYTES) return PopupRequestEncoding.Invalid("payload_too_large")
         return PopupRequestEncoding.Body(body)
     }
 

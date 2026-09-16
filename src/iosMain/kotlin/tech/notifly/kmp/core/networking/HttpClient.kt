@@ -5,8 +5,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import platform.Foundation.*
 
-internal actual fun createHttpClient(timeoutMillis: Long): HttpClient = HttpClient(Darwin) {
-    configureHttpClient(timeoutMillis)
+internal actual fun createHttpClient(): HttpClient = HttpClient(Darwin) {
+    configureHttpClient()
     engine {
         configureSession {
             HTTPCookieStorage = null

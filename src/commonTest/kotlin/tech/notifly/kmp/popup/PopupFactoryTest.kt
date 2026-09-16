@@ -20,7 +20,7 @@ class PopupFactoryTest {
         val renderer = createPopupRenderer(PopupRendererConfig("0123456789abcdef0123456789abcdef", "https://render.example", "sdk"), {
             created++
             HttpClient(MockEngine { requests++; respond("html-${requests}", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html")) }).also { client = it }
-        }, Dispatchers.Default) { 0L }
+        }, Dispatchers.Default)
         val outputs = mutableListOf<PopupRenderOutput>()
         assertEquals(0, created)
         outputs.add(renderer.awaitOutput(PopupRenderInput(null, null, null, null, null, "bad")))
@@ -38,7 +38,7 @@ class PopupFactoryTest {
     }
 
     @Test fun invalidBaseUrlAndCloseNeverInitializeClient() = runTest {
-        val renderer = createPopupRenderer(PopupRendererConfig("0123456789abcdef0123456789abcdef", "http://render.example", "sdk"), { error("must stay lazy") }, StandardTestDispatcher(testScheduler)) { testScheduler.currentTime }
+        val renderer = createPopupRenderer(PopupRendererConfig("0123456789abcdef0123456789abcdef", "http://render.example", "sdk"), { error("must stay lazy") }, StandardTestDispatcher(testScheduler))
         var output: PopupRenderOutput? = null
         renderer.render(PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}")) { output = it }
         runCurrent()
@@ -60,7 +60,7 @@ class PopupFactoryTest {
                 })
             },
             Dispatchers.Default,
-        ) { 0L }
+        )
         try {
             for (json in listOf(
                 "{\"x\":NaN,\"x\":1}",
@@ -94,7 +94,7 @@ class PopupFactoryTest {
                 })
             },
             Dispatchers.Default,
-        ) { 0L }
+        )
         try {
             for (dot in listOf(".", "..", "\uFEFF .\u00A0", " .. ")) {
                 for ((campaign, user) in listOf(dot to "user", "campaign" to dot)) {

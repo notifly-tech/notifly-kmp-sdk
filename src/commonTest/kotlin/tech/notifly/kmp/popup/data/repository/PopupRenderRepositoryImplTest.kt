@@ -107,16 +107,32 @@ class PopupRenderRepositoryImplTest {
         })
     }
 
-    @Test fun limitsRawInputAndActualBodyUtf8Bytes() = runTest {
-        val repository = PopupRenderRepositoryImpl("https://render.example") { error("must not create client") }
-        for (json in listOf(" ".repeat(262145), "{\"x\":\"" + "한".repeat(87379) + "\"}")) assertEquals(PopupRenderResult.Failed("payload_too_large"), repository.render(input.copy(eventParamsJson = json)))
+    @Test fun sendsLargeJsonWithoutLocalSizeLimit() = runTest {
+        for (value in listOf("a".repeat(300000), "한".repeat(100000))) {
+            val params = "{\"x\":\"$value\"}"
+            assertEquals(PopupRenderResult.Skipped, execute(input.copy(eventParamsJson = params)) {
+                assertEquals(
+                    "{\"deviceId\":\"device\",\"eventName\":\" open \",\"eventParams\":$params}",
+                    (it.body as OutgoingContent.ByteArrayContent).bytes().decodeToString(),
+                )
+                respond("", HttpStatusCode.NoContent)
+            })
+        }
+    }
+
+    @Test fun serializedBodyCanExceedFormerSizeLimit() = runTest {
         // This wire prefix and closing suffix occupy 63 ASCII bytes.
-        val base = input.copy(eventName = "open", eventParamsJson = "{\"x\":\"" + "a".repeat(262081) + "\"}")
+        val base = input.copy(eventName = "open", eventParamsJson = "{\"x\":\"" + "a".repeat(262082) + "\"}")
         assertEquals(PopupRenderResult.Skipped, execute(base) {
-            assertEquals(262144, (it.body as OutgoingContent.ByteArrayContent).bytes().size)
+            assertEquals(262145, (it.body as OutgoingContent.ByteArrayContent).bytes().size)
             respond("", HttpStatusCode.NoContent)
         })
-        assertEquals(PopupRenderResult.Failed("payload_too_large"), repository.render(base.copy(eventParamsJson = "{\"x\":\"" + "a".repeat(262082) + "\"}")))
+    }
+
+    @Test fun rejectsLargeMalformedJsonBeforeCreatingClient() = runTest {
+        val repository = PopupRenderRepositoryImpl("https://render.example") { error("must not create client") }
+        val params = "{\"x\":" + " ".repeat(300000) + "NaN}"
+        assertEquals(PopupRenderResult.Failed("invalid_request"), repository.render(input.copy(eventParamsJson = params)))
     }
 
     @Test fun transportFailuresHaveNoStatusIncludingBodyFailure() = runTest {

@@ -14,15 +14,14 @@ import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import kotlin.js.Promise
 
-internal actual fun createHttpClient(timeoutMillis: Long): HttpClient = HttpClient(BrowserFetchEngine { url, init ->
+internal actual fun createHttpClient(): HttpClient = HttpClient(BrowserFetchEngine { url, init ->
     js("globalThis").fetch(url, init).unsafeCast<Promise<dynamic>>()
 }) {
-    configureHttpClient(timeoutMillis)
+    configureHttpClient()
 }
 
 internal class BrowserFetchEngine(private val fetch: (String, dynamic) -> Promise<dynamic>) : HttpClientEngineBase("notifly-fetch") {
     override val config = HttpClientEngineConfig()
-    override val supportedCapabilities = setOf(io.ktor.client.plugins.HttpTimeout)
     override suspend fun execute(data: HttpRequestData): HttpResponseData {
         val context = callContext()
         val requestTime = GMTDate()

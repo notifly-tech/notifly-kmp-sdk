@@ -14,7 +14,7 @@ import tech.notifly.kmp.popup.model.*
 class PopupRendererConcurrencyTest {
     private fun renderer(block: suspend () -> PopupRenderResult) = PopupRenderer(
         RenderPopupUseCase("0123456789abcdef0123456789abcdef", "sdk", PopupRenderRepository { block() }),
-        {}, Dispatchers.Default, { System.nanoTime() / 1000000 },
+        {}, Dispatchers.Default,
     )
     private fun input(json: String = "{}") = PopupRenderInput("ssr", "campaign", "user", "device", "open", json)
 

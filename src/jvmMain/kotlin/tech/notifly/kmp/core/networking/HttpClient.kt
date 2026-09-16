@@ -8,8 +8,8 @@ import okhttp3.CookieJar
 import okhttp3.RequestBody
 import okio.BufferedSink
 
-internal actual fun createHttpClient(timeoutMillis: Long): HttpClient = HttpClient(OkHttp) {
-    configureHttpClient(timeoutMillis)
+internal actual fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
+    configureHttpClient()
     engine {
         config {
             retryOnConnectionFailure(false)

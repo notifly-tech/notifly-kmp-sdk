@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalJsExport::class, kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalJsExport::class)
 package tech.notifly.kmp.popup
 
 import io.ktor.client.HttpClient
@@ -6,7 +6,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import kotlin.time.TimeSource
 import tech.notifly.kmp.core.networking.createHttpClient
 import tech.notifly.kmp.popup.data.repository.PopupRenderRepositoryImpl
 import tech.notifly.kmp.popup.domain.usecase.RenderPopupUseCase
@@ -16,12 +15,11 @@ import tech.notifly.kmp.popup.model.PopupRendererConfig
 @JsExport
 object PopupFactory {
     fun create(config: PopupRendererConfig): PopupRenderer {
-        val origin = TimeSource.Monotonic.markNow()
-        return createPopupRenderer(config, { createHttpClient(20000) }, Dispatchers.Default) { origin.elapsedNow().inWholeMilliseconds }
+        return createPopupRenderer(config, { createHttpClient() }, Dispatchers.Default)
     }
 }
 
-internal fun createPopupRenderer(config: PopupRendererConfig, clientFactory: () -> HttpClient, dispatcher: CoroutineDispatcher, clock: () -> Long): PopupRenderer {
+internal fun createPopupRenderer(config: PopupRendererConfig, clientFactory: () -> HttpClient, dispatcher: CoroutineDispatcher): PopupRenderer {
     val lock = PlatformLock()
     var client: HttpClient? = null
     var closed = false
@@ -37,5 +35,5 @@ internal fun createPopupRenderer(config: PopupRendererConfig, clientFactory: () 
             client.also { client = null }
         }
         owned?.close()
-    }, dispatcher, clock)
+    }, dispatcher)
 }

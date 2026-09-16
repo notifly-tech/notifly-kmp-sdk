@@ -36,7 +36,7 @@ class BrowserFetchEngineTest {
             assertNotNull(init.signal)
             assertEquals("body", js("new TextDecoder().decode(init.body)") as String)
             Promise.resolve(response())
-        }) { configureHttpClient(20000) }
+        }) { configureHttpClient() }
         try {
             assertEquals("hi", client.post("https://render.example/request") { setBody("body") }.bodyAsText())
             assertEquals(1, calls)
@@ -49,7 +49,7 @@ class BrowserFetchEngineTest {
         val client = HttpClient(BrowserFetchEngine { _, init ->
             signal = init.signal
             Promise.resolve(response { bodyStarted.complete(Unit); Promise { _, _ -> } })
-        }) { configureHttpClient(20000) }
+        }) { configureHttpClient() }
         val job = launch { client.post("https://render.example").bodyAsText() }
         bodyStarted.await()
         job.cancelAndJoin()
@@ -64,7 +64,7 @@ class BrowserFetchEngineTest {
             signal = init.signal
             started.complete(Unit)
             Promise { _, _ -> }
-        }) { configureHttpClient(20000) }
+        }) { configureHttpClient() }
         val job = launch { client.post("https://render.example").bodyAsText() }
         started.await()
         job.cancelAndJoin()
@@ -74,7 +74,7 @@ class BrowserFetchEngineTest {
 
     @Test fun rejectsOpaqueStatusZeroAndBodyFailures() = runTest {
         for (raw in listOf(response(0), response { Promise.reject(IllegalStateException("disconnected")) })) {
-            val client = HttpClient(BrowserFetchEngine { _, _ -> Promise.resolve(raw) }) { configureHttpClient(20000) }
+            val client = HttpClient(BrowserFetchEngine { _, _ -> Promise.resolve(raw) }) { configureHttpClient() }
             try {
                 var failed = false
                 try { client.post("https://render.example").bodyAsText() } catch (error: Exception) { failed = true }
@@ -89,7 +89,7 @@ class BrowserFetchEngineTest {
             val client = HttpClient(BrowserFetchEngine { _, _ ->
                 if (duringBody) Promise.resolve(response { Promise.reject(js("new TypeError('body failed')")) })
                 else Promise.reject(js("new TypeError('fetch failed')"))
-            }) { configureHttpClient(20000) }
+            }) { configureHttpClient() }
             try {
                 assertEquals(PopupRenderResult.Failed("network_error"), PopupRenderRepositoryImpl("https://render.example") { client }.render(request))
             } finally { client.close() }
@@ -98,7 +98,7 @@ class BrowserFetchEngineTest {
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test fun nativeJavaScriptCallbackExceptionDoesNotEscapeOrBlockOtherCalls() = runTest {
-        val renderer = createPopupRenderer(PopupRendererConfig("", "", ""), { error("static needs no client") }, StandardTestDispatcher(testScheduler)) { 0L }
+        val renderer = createPopupRenderer(PopupRendererConfig("", "", ""), { error("static needs no client") }, StandardTestDispatcher(testScheduler))
         val input = PopupRenderInput(null, null, null, null, null, null)
         var calls = 0
         renderer.render(input) { calls++; js("throw new TypeError('callback failed')") }

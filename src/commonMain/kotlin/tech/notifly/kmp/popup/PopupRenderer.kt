@@ -14,15 +14,13 @@ class PopupRenderer internal constructor(
     private val useCase: RenderPopupUseCase,
     private val closeResources: () -> Unit,
     private val dispatcher: CoroutineDispatcher,
-    private val nowMillis: () -> Long,
 ) {
     private val lock = PlatformLock()
     private val pending = mutableSetOf<Pending>()
     private var closed = false
 
     fun render(input: PopupRenderInput, onComplete: (PopupRenderOutput) -> Unit): PopupRenderTask {
-        val startedAt = nowMillis()
-        val state = Pending(onComplete, if (input.templateRenderingMode == "ssr") startedAt + 20000 else null)
+        val state = Pending(onComplete)
         val task = PopupRenderTask { finish(state, PopupRenderResult.Cancelled) }
         val scope = CoroutineScope(dispatcher)
         val accepted = lock.withLock {
@@ -32,8 +30,7 @@ class PopupRenderer internal constructor(
                 pending.add(state)
                 state.work = scope.launch(start = CoroutineStart.LAZY) {
                     val result = try {
-                        if (state.deadline != null && nowMillis() >= state.deadline) PopupRenderResult.Failed("client_timeout")
-                        else useCase.render(PopupRenderRequest(input.templateRenderingMode, input.campaignId, input.notiflyUserId, input.deviceId, input.eventName, input.eventParamsJson))
+                        useCase.render(PopupRenderRequest(input.templateRenderingMode, input.campaignId, input.notiflyUserId, input.deviceId, input.eventName, input.eventParamsJson))
                     } catch (error: CancellationException) {
                         return@launch
                     } catch (error: Exception) {
@@ -41,20 +38,13 @@ class PopupRenderer internal constructor(
                     }
                     finish(state, result)
                 }
-                if (state.deadline != null) {
-                    state.timer = scope.launch(start = CoroutineStart.LAZY) {
-                        delay((state.deadline - nowMillis()).coerceAtLeast(0))
-                        finish(state, PopupRenderResult.Failed("client_timeout"))
-                    }
-                }
                 true
             }
         }
         if (accepted) {
-            // Copies are safe even if cancel/close wins before launch: cancelled lazy jobs stay cancelled.
-            val jobs = lock.withLock { state.work to state.timer }
-            jobs.first?.start()
-            jobs.second?.start()
+            // A cancelled lazy job stays cancelled if cancel/close wins before launch.
+            val work = lock.withLock { state.work }
+            work?.start()
         } else finish(state, PopupRenderResult.Failed("renderer_closed"))
         return task
     }
@@ -78,14 +68,9 @@ class PopupRenderer internal constructor(
     // The caller holds the renderer lock. close settles every pending task in one transition.
     private fun settle(state: Pending, proposed: PopupRenderResult): Completion? {
         val callback = state.callback ?: return null
-        val checksDeadline = proposed != PopupRenderResult.Cancelled &&
-            proposed != PopupRenderResult.Failed("renderer_closed")
-        val expired = state.deadline != null && checksDeadline && nowMillis() >= state.deadline
-        val result = if (expired) PopupRenderResult.Failed("client_timeout") else proposed
-        val completion = Completion(callback, result.toOutput(), state.work, state.timer)
+        val completion = Completion(callback, proposed.toOutput(), state.work)
         state.callback = null
         state.work = null
-        state.timer = null
         state.task?.detach()
         state.task = null
         pending.remove(state)
@@ -94,7 +79,6 @@ class PopupRenderer internal constructor(
 
     private fun deliver(completion: Completion) {
         completion.work?.cancel()
-        completion.timer?.cancel()
         // This delivery job is independent of the request job, including cancel and close.
         CoroutineScope(dispatcher).launch {
             yield()
@@ -107,13 +91,12 @@ class PopupRenderer internal constructor(
 
 }
 
-private class Pending(var callback: ((PopupRenderOutput) -> Unit)?, val deadline: Long?) {
+private class Pending(var callback: ((PopupRenderOutput) -> Unit)?) {
     var task: PopupRenderTask? = null
     var work: Job? = null
-    var timer: Job? = null
 }
 
-private class Completion(val callback: (PopupRenderOutput) -> Unit, val output: PopupRenderOutput, val work: Job?, val timer: Job?)
+private class Completion(val callback: (PopupRenderOutput) -> Unit, val output: PopupRenderOutput, val work: Job?)
 
 private fun PopupRenderResult.toOutput(): PopupRenderOutput = when (this) {
     PopupRenderResult.Static -> PopupRenderOutput("static", null, null, null)

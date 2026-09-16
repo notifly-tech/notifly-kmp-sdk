@@ -22,7 +22,7 @@ class BrowserHttpIntegrationTest {
 
     @Test
     fun sameAndCrossOriginRequestsOmitCookiesAndUseOnlyAllowedPreflightHeaders() = runTest {
-        val client = createHttpClient(5000)
+        val client = createHttpClient()
         document.cookie = "notifly_popup_fixture=synthetic; Path=/; SameSite=Lax"
         try {
             client.post("$sameOrigin/__notifly_popup_fixture/reset")
@@ -57,7 +57,7 @@ class BrowserHttpIntegrationTest {
 
     @Test
     fun emptyAndRedirectResponsesPreserveStatusAndNeverFollowRedirects() = runTest {
-        val client = createHttpClient(5000)
+        val client = createHttpClient()
         try {
             client.post("$sameOrigin/__notifly_popup_fixture/reset")
             val empty = client.post("$sameOrigin/__notifly_popup_fixture/empty")
@@ -80,7 +80,7 @@ class BrowserHttpIntegrationTest {
 
     @Test
     fun cancellationAbortsAfterHeadersWhileResponseBodyIsPending() = runTest {
-        val client = createHttpClient(5000)
+        val client = createHttpClient()
         try {
             client.post("$sameOrigin/__notifly_popup_fixture/reset")
             val request = launch {

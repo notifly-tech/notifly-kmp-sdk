@@ -2,16 +2,10 @@ package tech.notifly.kmp.core.networking
 
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
-import io.ktor.client.plugins.HttpTimeout
 
-internal expect fun createHttpClient(timeoutMillis: Long): HttpClient
+internal expect fun createHttpClient(): HttpClient
 
-internal fun HttpClientConfig<*>.configureHttpClient(timeoutMillis: Long) {
+internal fun HttpClientConfig<*>.configureHttpClient() {
     expectSuccess = false
     followRedirects = false
-    install(HttpTimeout) {
-        requestTimeoutMillis = timeoutMillis
-        connectTimeoutMillis = timeoutMillis
-        socketTimeoutMillis = timeoutMillis
-    }
 }

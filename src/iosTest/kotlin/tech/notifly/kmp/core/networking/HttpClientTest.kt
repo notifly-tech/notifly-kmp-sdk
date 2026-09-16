@@ -7,7 +7,7 @@ import kotlin.test.*
 
 class HttpClientTest {
     @Test fun nativeSessionAndRequestDisableSharedCookiesCredentialsAndCache() {
-        val client = createHttpClient(20000)
+        val client = createHttpClient()
         try {
             val config = client.engine.config as DarwinClientEngineConfig
             val session = NSURLSessionConfiguration.defaultSessionConfiguration()

@@ -13,9 +13,8 @@ class PopupRendererTest {
     private val input = PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}")
     private fun TestScope.renderer(
         close: () -> Unit = {},
-        clock: () -> Long = { testScheduler.currentTime },
         block: suspend (ValidatedPopupRenderRequest) -> PopupRenderResult = { PopupRenderResult.Rendered("html") },
-    ) = PopupRenderer(RenderPopupUseCase("0123456789abcdef0123456789abcdef", "sdk", PopupRenderRepository(block)), close, StandardTestDispatcher(testScheduler), clock)
+    ) = PopupRenderer(RenderPopupUseCase("0123456789abcdef0123456789abcdef", "sdk", PopupRenderRepository(block)), close, StandardTestDispatcher(testScheduler))
 
     @Test fun immediateSuccessIsAsynchronousAndFinal() = runTest {
         val outcomes = mutableListOf<PopupRenderOutput>()
@@ -84,7 +83,7 @@ class PopupRendererTest {
         assertEquals(1, closed)
     }
 
-    @Test fun deadlineCancelsWorkAndProducesClientTimeoutOnlyOnce() = runTest {
+    @Test fun pendingRequestSurvivesTwentySecondsAndCanStillBeCancelled() = runTest {
         var requestCancelled = false
         val outcomes = mutableListOf<PopupRenderOutput>()
         val renderer = renderer {
@@ -92,66 +91,43 @@ class PopupRendererTest {
         }
         val task = renderer.render(input) { outcomes.add(it) }
         runCurrent()
-        advanceTimeBy(20000)
-        runCurrent()
-        task.cancel()
-        renderer.close()
-        runCurrent()
+        try {
+            advanceTimeBy(60000)
+            runCurrent()
+            assertTrue(outcomes.isEmpty())
+            assertFalse(requestCancelled)
+        } finally {
+            task.cancel()
+            renderer.close()
+            runCurrent()
+        }
         assertTrue(requestCancelled)
         assertEquals(1, outcomes.size)
-        assertEquals("client_timeout", outcomes.single().errorCode)
+        assertEquals("cancelled", outcomes.single().outcome)
+        assertNull(outcomes.single().errorCode)
         assertNull(outcomes.single().httpStatus)
     }
 
-    @Test fun resumedRuntimeRejectsLateSuccessEvenBeforeTimerRuns() = runTest {
-        var monotonic = 0L
+    @Test fun returnsHtmlAfterTwentySeconds() = runTest {
         val outcomes = mutableListOf<PopupRenderOutput>()
-        val renderer = renderer(clock = { monotonic }) {
-            monotonic = 20001
+        val renderer = renderer {
+            delay(30000)
             PopupRenderResult.Rendered("late html")
         }
         renderer.render(input) { outcomes.add(it) }
-        runCurrent()
-        assertEquals("client_timeout", outcomes.single().errorCode)
-        assertNull(outcomes.single().html)
-        renderer.close()
+        try {
+            advanceTimeBy(30000)
+            runCurrent()
+            assertEquals(1, outcomes.size)
+            assertEquals("rendered", outcomes.single().outcome)
+            assertEquals("late html", outcomes.single().html)
+            assertEquals(200, outcomes.single().httpStatus)
+            assertNull(outcomes.single().errorCode)
+        } finally { renderer.close() }
     }
 
-    @Test fun successFinalizedWithinBudgetSurvivesDelayedCallbackDelivery() = runTest {
-        var monotonic = 0L
-        val outcomes = mutableListOf<PopupRenderOutput>()
-        val renderer = renderer(clock = {
-            val observed = monotonic
-            // The final deadline read observes 19.999s; callback dispatch resumes after 21s.
-            if (monotonic == 19999L) monotonic = 21000L
-            observed
-        }) {
-            monotonic = 19999L
-            PopupRenderResult.Rendered("html")
-        }
-        val task = renderer.render(input) { outcomes.add(it) }
-        runCurrent()
-        assertEquals(21000L, monotonic)
-        assertEquals("rendered", outcomes.single().outcome)
-        task.cancel()
-        renderer.close()
-        runCurrent()
-        assertEquals(1, outcomes.size)
-    }
-
-    @Test fun elapsedBudgetBeforeWorkerStartsAvoidsRepositoryCall() = runTest {
-        var monotonic = 0L
-        val outcomes = mutableListOf<PopupRenderOutput>()
-        val renderer = renderer(clock = { monotonic }) { error("deadline already expired") }
-        renderer.render(input) { outcomes.add(it) }
-        monotonic = 20000
-        runCurrent()
-        assertEquals("client_timeout", outcomes.single().errorCode)
-        renderer.close()
-    }
-
-    @Test fun completedHttpTimeoutKeepsServerStatusAfterDeadlineAndCancel() = runTest {
-        for ((code, status) in listOf("request_timeout" to 408, "popup_render_timeout" to 504)) {
+    @Test fun completedServerErrorsKeepStatusAfterCancel() = runTest {
+        for ((code, status) in listOf("request_timeout" to 408, "payload_too_large" to 413, "popup_render_timeout" to 504)) {
             val outcomes = mutableListOf<PopupRenderOutput>()
             val renderer = renderer { PopupRenderResult.Failed(code, status) }
             val task = renderer.render(input) { outcomes.add(it) }
