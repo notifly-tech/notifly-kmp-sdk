@@ -1,26 +1,42 @@
 # AGENTS.md
 
-이 파일은 이 저장소에서 작업하는 에이전트의 주석 작성 기준을 정의합니다.
+This file defines repository conventions for coding agents.
 
-## 주석 컨벤션
+## Language
 
-### 설명 위치와 목적
+- All repository documentation, code comments, identifiers, and test names must be written in English. This includes this file, README files, KDoc, and assertion messages.
+- Non-English text is allowed only when required as test data, such as Unicode, encoding, or localization fixtures. Preserve those fixtures instead of translating them.
+- This rule applies to repository content, not the language of conversations with the user.
 
-- 코드 주석은 영어로 작성합니다.
-- 설명은 기본적으로 함수, 클래스, 인터페이스 등 선언 바로 위에 작성합니다. Kotlin에서는 KDoc(`/** ... */`)을 사용합니다.
-- 공개 API에는 목적과 사용 계약을 설명합니다. 필요한 경우 입력 조건, 결과, 실패 동작, 취소, 자원 수명, 스레드 또는 콜백 실행 관련 보장을 포함합니다.
-- 내부 함수도 의도나 전제 조건이 이름과 코드만으로 명확하지 않으면 함수 위에 짧게 설명합니다. 모든 단순 함수에 형식적인 주석을 추가하지는 않습니다.
-- 함수 전체에 적용되는 설계 이유나 제약은 함수 위에 모읍니다. 긴 설명이 필요하면 문단을 나누되 구현 과정을 줄마다 나열하지 않습니다.
+## Kotlin style and linting
 
-### KDoc 형식
+- Use the pinned ktlint Gradle plugin and engine configured in `build.gradle.kts` and the style rules in `.editorconfig`.
+- Run `./gradlew ktlintCheck --no-daemon` before committing or pushing Kotlin changes.
+- Run `./gradlew ktlintFormat --no-daemon` to apply automatic fixes, inspect the diff, and rerun the check.
+- Kotlin production code, tests, Gradle Kotlin scripts, and Kotlin consumer smoke fixtures are in scope. Generated files and build outputs are excluded.
+- CI and release workflows check formatting; they do not rewrite files.
+- Prefer explicit imports. Use four-space indentation and a 120-character Kotlin line limit.
+- Do not add a baseline or disable rules solely to hide existing violations. Explain any necessary, narrowly scoped exception.
+- ktlint enforces syntax and style, not English prose or the meaning of tests. Review the conventions below as well.
 
-- 첫 문단은 역할을 짧고 명확하게 요약합니다. 추가 사용 조건이나 주의사항은 빈 줄 뒤에 작성합니다.
-- 한 줄에 충분히 들어가는 설명은 `/** Short description. */` 형식을 사용할 수 있습니다. 여러 줄이면 `/**`와 `*/`를 별도 줄에 두고 각 본문 줄을 ` * `로 시작합니다.
-- 함수, 타입, 파라미터를 참조할 때는 `[render]`, `[input]` 같은 KDoc 링크를 사용합니다. 문자열 값이나 코드 표현에는 백틱을 사용합니다.
-- 파라미터와 반환값은 가능하면 본문에서 설명합니다. 본문 흐름에 넣기 어려운 긴 설명에만 `@param`과 `@return`을 사용하고, 빈 태그나 이름을 반복하는 설명은 작성하지 않습니다.
-- 공통 계약은 공통 선언이나 인터페이스에 작성합니다. 동일한 내용을 모든 override나 플랫폼 구현에 복사하지 말고, 플랫폼별 차이가 있을 때만 해당 선언 위에 보완합니다.
+## Comment conventions
 
-예를 들어 `PopupRenderer.close()` 위에는 다음처럼 사용 계약을 설명합니다.
+### Placement and purpose
+
+- Write explanations above the relevant function, class, or interface. Use KDoc (`/** ... */`) for Kotlin declarations.
+- Document public API purpose and usage contracts. Include input conditions, results, failures, cancellation, resource ownership, and threading or callback guarantees when relevant.
+- Add short declaration-level explanations for internal functions whose intent or preconditions are not obvious. Do not add boilerplate comments to every trivial function.
+- Keep design rationale and constraints that apply to an entire function above its declaration. Use paragraphs for longer explanations instead of narrating implementation steps line by line.
+
+### KDoc format
+
+- Start with a concise summary. Put additional conditions or caveats in a separate paragraph.
+- Use `/** Short description. */` when the explanation fits on one line. For multiline KDoc, put the delimiters on separate lines and start each content line with ` * `.
+- Link declarations and parameters with KDoc references such as `[render]` and `[input]`. Use backticks for literal values and code expressions.
+- Describe parameters and return values in prose where practical. Use `@param` and `@return` only when separate, substantial descriptions improve readability; do not add empty or redundant tags.
+- Document shared contracts on the common declaration or interface. Do not copy the same explanation into every override or platform implementation; document only platform-specific differences there.
+
+For example, document the contract above `PopupRenderer.close()`:
 
 ```kotlin
 /**
@@ -31,28 +47,61 @@
  */
 ```
 
-### 함수 내부 주석 최소화
+### Minimal inline comments
 
-- 함수 내부의 `//` 및 `/* ... */` 주석은 최소화합니다. 이름 개선이나 함수 분리로 의도를 표현할 수 있는지 먼저 검토합니다.
-- 코드가 무엇을 하는지 그대로 반복하는 주석, 실행 단계를 번호로 나열하는 주석, 장식용 구분선은 추가하지 않습니다.
-- 특정 코드 위치에 있어야 오해를 막을 수 있는 예외적인 이유나 제약만 내부 주석으로 남깁니다. 예를 들어 동시성 불변 조건, 플랫폼 버그 우회, 보안상 필요한 처리의 이유가 해당합니다.
-- 내부 주석이 꼭 필요하면 관련 코드 바로 위에 짧게 작성합니다. 실제 위험을 설명하는 유용한 주석을 줄 수를 줄이기 위해 무조건 삭제하지는 않습니다.
-- 향후 작업은 필요한 경우에만 `TODO`로 남기고, 실제 이슈 번호나 링크를 함께 적습니다.
+- Minimize `//` and `/* ... */` comments inside functions. Consider clearer names or smaller functions before adding an explanation.
+- Do not repeat the code in prose, number routine execution steps, or add decorative separators.
+- Keep inline comments only when their exact location is important to explain a non-obvious constraint, such as a concurrency invariant, platform workaround, or security requirement.
+- Keep necessary inline comments short and directly above the relevant code. Do not remove useful risk explanations merely to reduce the comment count.
+- Add `TODO` comments only when necessary, with a real issue number or link.
 
-예를 들어 단순한 `pending.remove(state)`에 `// Remove the request.`를 붙이지 않습니다. 반면 잠금 소유 조건이 필요한 내부 함수라면 함수 위에 다음처럼 설명할 수 있습니다.
+Do not annotate `pending.remove(state)` with `// Remove the request.` A lock ownership precondition belongs above the function:
 
 ```kotlin
 /** Settles a request while the caller holds the renderer lock. */
 ```
 
-### 유지보수와 다른 언어
+### Maintenance and other languages
 
-- 동작을 변경할 때 관련 주석도 함께 수정합니다. 주석에는 현재 구현이 실제로 보장하는 동작만 적습니다.
-- JS, Swift, Ruby, 셸 코드에도 선언 위 설명과 내부 주석 최소화 원칙을 적용하되, 주석 문법은 해당 언어에 맞춥니다.
+- Update comments whenever behavior changes. Document only guarantees the implementation actually provides.
+- Apply the same declaration-first, minimal-inline principles to JavaScript, Swift, Ruby, and shell code using the appropriate comment syntax.
 
-## 참고 자료
+## Test conventions
 
-- [Kotlin documentation comments](https://kotlinlang.org/docs/coding-conventions.html#documentation-comments)
+### Names and structure
+
+- Use `kotlin.test` for shared tests. Name files and classes after the subject, such as `PopupRendererTest`; add a qualifier for focused integration or concurrency tests.
+- Name new or substantially rewritten tests `<subject>_<condition>_<expectedResult>`, using camelCase within each segment. For example, `render_staticMode_returnsStaticWithoutFetching`.
+- Keep `@Test` on its own line. Separate preparation, execution, and assertions with blank lines (Arrange-Act-Assert), without requiring repeated section comments.
+- Test one behavior per test, not necessarily one assertion. A lifecycle scenario may contain multiple actions when their order is the behavior under test.
+- Prefer named arguments when positional values, repeated booleans, or nulls obscure intent. Do not compress multiple statements onto one line.
+- Let the test name explain the purpose. Add KDoc only for a non-obvious reproduction condition or platform constraint.
+
+### Assertions and fixtures
+
+- Verify observable results and contracts rather than private implementation details. Verify interactions when they are part of the contract, such as avoiding HTTP requests for static popups.
+- Prefer specific assertions such as `assertEquals(expected, actual)` and `assertNull(actual)` over generic Boolean comparisons.
+- Keep important inputs and expected values visible in the test. Use small setup helpers; do not introduce a shared base class or custom DSL merely to remove duplication.
+- Table-driven cases may share a test when they verify the same behavior. Include a case label or input in failure messages and avoid computing expected results with production logic.
+- Keep tests independent of execution order and shared mutable state. Release clients, renderers, servers, and other resources even when an assertion fails, using `finally` or lifecycle hooks.
+
+### Multiplatform and asynchronous tests
+
+- Put platform-independent behavior in `commonTest`; use `jvmTest`, `iosTest`, and `jsTest` for platform-specific behavior.
+- Write shared coroutine tests as `fun ...() = runTest { ... }` so the test result is returned immediately on JavaScript as well.
+- Use `StandardTestDispatcher(testScheduler)` and virtual time for deterministic coroutine unit tests. Share one scheduler and use `runCurrent`, `advanceTimeBy`, or `advanceUntilIdle` according to the behavior being checked.
+- Do not use real sleeps to coordinate coroutine unit tests. Real-thread concurrency and real-transport tests may use platform facilities, with bounded waits and reliable cleanup; virtual time does not replace those tests.
+- Use Ktor `MockEngine` for HTTP request/response contracts and local fixtures for actual transport behavior. Do not call staging or production services from the unit suite.
+- Run `./gradlew jvmTest jsNodeTest jsBrowserTest iosSimulatorArm64Test --no-daemon` after shared behavior changes. Apple targets require macOS and Xcode, and browser tests require Chrome.
+
+## References
+
+- [ktlint Gradle plugin](https://github.com/JLLeitschuh/ktlint-gradle)
+- [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
 - [KDoc syntax](https://kotlinlang.org/docs/kotlin-doc.html)
 - [Kotlin library documentation guidelines](https://kotlinlang.org/docs/api-guidelines-informative-documentation.html)
 - [Google code review guidance on comments](https://google.github.io/eng-practices/review/reviewer/looking-for.html#comments)
+- [Google unit testing guidance](https://abseil.io/resources/swe-book/html/ch12.html)
+- [Kotlin Multiplatform testing](https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html)
+- [Coroutine test API](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-test/)
+- [Ktor client testing](https://ktor.io/docs/client-testing.html)

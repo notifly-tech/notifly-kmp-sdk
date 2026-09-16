@@ -100,6 +100,10 @@ jobs:
             echo "github_release_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check Kotlin style
+        if: steps.release-state.outputs.tag_exists != 'true'
+        run: ./gradlew ktlintCheck --no-daemon
+
       - name: Test and build
         run: |
           ./gradlew \

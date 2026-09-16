@@ -1,12 +1,21 @@
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package tech.notifly.kmp.core.networking
 
 import io.ktor.client.engine.darwin.DarwinClientEngineConfig
-import platform.Foundation.*
-import kotlin.test.*
+import platform.Foundation.HTTPShouldHandleCookies
+import platform.Foundation.NSMutableURLRequest
+import platform.Foundation.NSURL
+import platform.Foundation.NSURLRequestReloadIgnoringLocalCacheData
+import platform.Foundation.NSURLSessionConfiguration
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 class HttpClientTest {
-    @Test fun nativeSessionAndRequestDisableSharedCookiesCredentialsAndCache() {
+    @Test
+    fun nativeSessionAndRequestDisableSharedCookiesCredentialsAndCache() {
         val client = createHttpClient()
         try {
             val config = client.engine.config as DarwinClientEngineConfig
@@ -21,6 +30,8 @@ class HttpClientTest {
             config.requestConfig(request)
             assertFalse(request.HTTPShouldHandleCookies)
             assertEquals(NSURLRequestReloadIgnoringLocalCacheData, request.cachePolicy)
-        } finally { client.close() }
+        } finally {
+            client.close()
+        }
     }
 }

@@ -78,6 +78,25 @@ Requirements:
 - Node.js 22
 - Xcode 16 or later for Apple targets
 
+Check Kotlin source, tests, and Gradle scripts before committing:
+
+```bash
+./gradlew ktlintCheck --no-daemon
+```
+
+Apply automatic formatting when needed, then rerun the check:
+
+```bash
+./gradlew ktlintFormat --no-daemon
+./gradlew ktlintCheck --no-daemon
+```
+
+The ktlint Gradle plugin and engine versions are pinned in `build.gradle.kts`.
+Style settings live in `.editorconfig`. CI and new releases run the check without
+modifying files. Resuming an existing release skips lint so older tags remain
+rebuildable. See [AGENTS.md](AGENTS.md) for English-language, comment, and test
+conventions; semantic conventions still require review.
+
 Run the shared test suite:
 
 ```bash

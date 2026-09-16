@@ -80,7 +80,7 @@ assert_contract(step_names.include?("Create GitHub release"), "release must publ
 assert_contract(workflow.include?('NotiflyKMP.xcframework.zip.sha256'), "release must attach the XCFramework SHA-256 file")
 assert_contract(step_names.include?("Restore checksum asset on an existing release"), "resumed releases must restore the checksum asset")
 assert_contract(gradle_build.include?("github.com/notifly-tech/notifly-kmp-sdk"), "local JS package metadata must use the notifly-tech repository")
-assert_contract(gradle_build.include?('artifactId = if') && gradle_build.include?('"notifly-kmp-sdk"'), "KMP root publication must use the official artifact ID")
+assert_contract(gradle_build.match?(/artifactId\s*=\s*if\b/) && gradle_build.include?('"notifly-kmp-sdk"'), "KMP root publication must use the official artifact ID")
 assert_contract(gradle_build.include?("CENTRAL_STAGING_REPOSITORY"), "Android releases must be able to stage the KMP Maven publications")
 assert_contract(maven_smoke_build.include?('implementation("tech.notifly:notifly-kmp-sdk:$notiflyKmpVersion")'), "Kotlin 1.8.10 smoke test must consume the official coordinate")
 assert_contract(package.include?("github.com/notifly-tech/notifly-kmp-sdk"), "Swift package metadata must use the notifly-tech repository")

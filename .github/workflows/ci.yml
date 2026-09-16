@@ -32,6 +32,9 @@ jobs:
       - name: Verify SDK submodule update workflow
         run: ruby scripts/test-sdk-bump-workflow.rb
 
+      - name: Check Kotlin style
+        run: ./gradlew ktlintCheck --no-daemon
+
       - name: Test common code
         run: |
           ./gradlew \

@@ -17,11 +17,12 @@ private fun renderAndAwait(
     val callbackCount = AtomicInteger()
     val output = AtomicReference<PopupRenderOutput>()
     val completed = CountDownLatch(1)
-    val task: PopupRenderTask = renderer.render(input) {
-        output.set(it)
-        callbackCount.incrementAndGet()
-        completed.countDown()
-    }
+    val task: PopupRenderTask =
+        renderer.render(input) {
+            output.set(it)
+            callbackCount.incrementAndGet()
+            completed.countDown()
+        }
     afterRender(task)
     check(completed.await(5, TimeUnit.SECONDS)) { "popup callback timed out" }
     Thread.sleep(100)
@@ -33,29 +34,34 @@ fun main() {
     check(UserIdTransitionPolicy.evaluate(null, "A").shouldMerge)
 
     val staticRenderer = PopupFactory.create(PopupRendererConfig("", "not-https", ""))
-    val static = renderAndAwait(
-        staticRenderer,
-        PopupRenderInput("static", null, null, null, null, null),
-    )
+    val static =
+        renderAndAwait(
+            staticRenderer,
+            PopupRenderInput("static", null, null, null, null, null),
+        )
     check(static.outcome == "static")
     check(static.html == null && static.errorCode == null && static.httpStatus == null)
     staticRenderer.close()
 
-    val closed = renderAndAwait(
-        staticRenderer,
-        PopupRenderInput("static", null, null, null, null, null),
-    )
+    val closed =
+        renderAndAwait(
+            staticRenderer,
+            PopupRenderInput("static", null, null, null, null, null),
+        )
     check(closed.outcome == "failed" && closed.errorCode == "renderer_closed")
 
     val cancellableRenderer = PopupFactory.create(PopupRendererConfig("", "not-https", ""))
-    val cancelledOrCompleted = renderAndAwait(
-        cancellableRenderer,
-        PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}"),
-    ) { task ->
-        task.cancel()
-        task.cancel()
-    }
-    check(cancelledOrCompleted.outcome == "cancelled" ||
-        (cancelledOrCompleted.outcome == "failed" && cancelledOrCompleted.errorCode == "invalid_configuration"))
+    val cancelledOrCompleted =
+        renderAndAwait(
+            cancellableRenderer,
+            PopupRenderInput("ssr", "campaign", "user", "device", "open", "{}"),
+        ) { task ->
+            task.cancel()
+            task.cancel()
+        }
+    check(
+        cancelledOrCompleted.outcome == "cancelled" ||
+            (cancelledOrCompleted.outcome == "failed" && cancelledOrCompleted.errorCode == "invalid_configuration"),
+    )
     cancellableRenderer.close()
 }

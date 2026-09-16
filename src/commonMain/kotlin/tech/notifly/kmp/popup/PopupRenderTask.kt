@@ -1,13 +1,16 @@
 @file:OptIn(ExperimentalJsExport::class)
+
 package tech.notifly.kmp.popup
 
+import tech.notifly.kmp.popup.internal.PlatformLock
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import tech.notifly.kmp.popup.internal.PlatformLock
 
 /** A cancellation handle for one [PopupRenderer.render] call. */
 @JsExport
-class PopupRenderTask internal constructor(cancelAction: () -> Unit) {
+class PopupRenderTask internal constructor(
+    cancelAction: () -> Unit,
+) {
     private val lock = PlatformLock()
     private var cancelAction: (() -> Unit)? = cancelAction
 

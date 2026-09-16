@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalJsExport::class)
+
 package tech.notifly.kmp.popup.model
 
 import kotlin.js.ExperimentalJsExport

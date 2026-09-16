@@ -7,7 +7,11 @@ import tech.notifly.kmp.popup.domain.model.ValidatedPopupRenderRequest
 import tech.notifly.kmp.popup.domain.model.trimJsWhitespace
 import tech.notifly.kmp.popup.domain.repository.PopupRenderRepository
 
-internal class RenderPopupUseCase(private val projectId: String, private val sdkVersion: String, private val repository: PopupRenderRepository) {
+internal class RenderPopupUseCase(
+    private val projectId: String,
+    private val sdkVersion: String,
+    private val repository: PopupRenderRepository,
+) {
     /**
      * Bypasses static requests and validates SSR configuration and identifiers before repository access.
      *
@@ -15,9 +19,15 @@ internal class RenderPopupUseCase(private val projectId: String, private val sdk
      * even when percent-encoded. Event JSON validation belongs to the repository's encoding boundary.
      */
     suspend fun render(request: PopupRenderRequest): PopupRenderResult {
-        if (PopupRenderingMode.from(request.templateRenderingMode) == PopupRenderingMode.STATIC) return PopupRenderResult.Static
+        if (PopupRenderingMode.from(request.templateRenderingMode) ==
+            PopupRenderingMode.STATIC
+        ) {
+            return PopupRenderResult.Static
+        }
         val header = sdkVersion.trimJsWhitespace()
-        if (!Regex("[0-9a-f]{32}").matches(projectId) || header.length !in 1..64 || '\r' in sdkVersion || '\n' in sdkVersion) {
+        if (!Regex("[0-9a-f]{32}").matches(projectId) || header.length !in 1..64 || '\r' in sdkVersion ||
+            '\n' in sdkVersion
+        ) {
             return PopupRenderResult.Failed("invalid_configuration")
         }
         val user = request.notiflyUserId?.trimJsWhitespace()
@@ -35,6 +45,8 @@ internal class RenderPopupUseCase(private val projectId: String, private val sdk
         if (user == "." || user == ".." || campaign == "." || campaign == "..") {
             return PopupRenderResult.Failed("invalid_request")
         }
-        return repository.render(ValidatedPopupRenderRequest(projectId, header, campaign, user, device, event, request.eventParamsJson))
+        return repository.render(
+            ValidatedPopupRenderRequest(projectId, header, campaign, user, device, event, request.eventParamsJson),
+        )
     }
 }

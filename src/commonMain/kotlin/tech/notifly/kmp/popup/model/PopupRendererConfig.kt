@@ -1,4 +1,5 @@
 @file:OptIn(ExperimentalJsExport::class)
+
 package tech.notifly.kmp.popup.model
 
 import kotlin.js.ExperimentalJsExport
@@ -14,4 +15,8 @@ import kotlin.js.JsExport
  * Invalid configuration produces `invalid_configuration` when rendering an SSR popup.
  */
 @JsExport
-class PopupRendererConfig(val projectId: String, val baseUrl: String, val sdkVersion: String)
+class PopupRendererConfig(
+    val projectId: String,
+    val baseUrl: String,
+    val sdkVersion: String,
+)
