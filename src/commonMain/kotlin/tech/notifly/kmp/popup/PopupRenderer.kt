@@ -38,6 +38,30 @@ class PopupRenderer internal constructor(
      * Completion and task cancellation compete for the first terminal result. The callback
      * runs asynchronously outside the state lock, with no main-thread guarantee. Callback failures
      * are contained and do not produce another result.
+     *
+     * These examples use a renderer from [PopupFactory.create] and a [PopupRenderInput]. Keep the
+     * returned task to cancel this request. Dispatch UI updates to the platform's UI thread separately.
+     *
+     * Android / Kotlin:
+     * ```kotlin
+     * val task = renderer.render(input) { output ->
+     *     println(output.outcome)
+     * }
+     * ```
+     *
+     * iOS / Swift:
+     * ```swift
+     * let task = renderer.render(input: input) { output in
+     *     print(output.outcome)
+     * }
+     * ```
+     *
+     * JavaScript (create `input` with `popup.createPopupRenderInput`):
+     * ```javascript
+     * const task = renderer.render(input, (output) => {
+     *   console.log(output.outcome);
+     * });
+     * ```
      */
     fun render(
         input: PopupRenderInput,

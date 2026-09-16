@@ -20,6 +20,24 @@ object PopupFactory {
      *
      * Renderers share a lazily initialized HTTP client and require no explicit cleanup.
      * Configuration is validated when rendering an SSR popup, not during construction.
+     *
+     * These examples use a host-provided [PopupRendererConfig]. JavaScript's `sdk` is the imported KMP module.
+     *
+     * Android / Kotlin:
+     * ```kotlin
+     * val renderer = PopupFactory.create(config)
+     * ```
+     *
+     * iOS / Swift (after `import NotiflyKMP`):
+     * ```swift
+     * let renderer = PopupFactory.shared.create(config: config)
+     * ```
+     *
+     * JavaScript:
+     * ```javascript
+     * const popup = sdk.tech.notifly.kmp.popup;
+     * const renderer = popup.PopupFactory.create(config);
+     * ```
      */
     fun create(config: PopupRendererConfig): PopupRenderer =
         createPopupRenderer(config, { sharedHttpClient }, Dispatchers.Default)

@@ -18,6 +18,40 @@ import kotlin.js.JsExport
  * Do not mutate the supplied collections while a render is pending.
  *
  * JavaScript callers should use `createPopupRenderInput` to convert plain objects and arrays.
+ * The identifiers below are examples; use the actual campaign, user, and device IDs in the host SDK.
+ *
+ * Android / Kotlin:
+ * ```kotlin
+ * val input = PopupRenderInput(
+ *     templateRenderingMode = "ssr",
+ *     campaignId = "campaign-id",
+ *     notiflyUserId = "user-id",
+ *     deviceId = "device-id",
+ *     eventName = "purchase",
+ *     eventParams = mapOf("items" to listOf(mapOf("id" to "P1", "quantity" to 2))),
+ * )
+ * ```
+ *
+ * iOS / Swift (after `import NotiflyKMP`):
+ * ```swift
+ * let input = PopupRenderInput(
+ *     templateRenderingMode: "ssr",
+ *     campaignId: "campaign-id",
+ *     notiflyUserId: "user-id",
+ *     deviceId: "device-id",
+ *     eventName: "purchase",
+ *     eventParams: ["items": [["id": "P1", "quantity": 2]]]
+ * )
+ * ```
+ *
+ * JavaScript (`sdk` is the imported KMP module; do not pass a plain object to the Map constructor parameter):
+ * ```javascript
+ * const popup = sdk.tech.notifly.kmp.popup;
+ * const input = popup.createPopupRenderInput(
+ *   "ssr", "campaign-id", "user-id", "device-id", "purchase",
+ *   { items: [{ id: "P1", quantity: 2 }] },
+ * );
+ * ```
  */
 @JsExport
 class PopupRenderInput(

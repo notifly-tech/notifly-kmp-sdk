@@ -14,6 +14,20 @@ import kotlin.js.JsExport
  * functions, symbols, bigint, class instances, and circular references are invalid. Conversion errors
  * are reported by [PopupRenderer.render] as `invalid_request`, not thrown to the caller. Modes other
  * than `ssr` bypass conversion. JavaScript numbers retain their existing precision.
+ *
+ * JavaScript-only entry point. Android/Kotlin and iOS/Swift construct [PopupRenderInput] directly.
+ * With the default package name (`sdk` may also be the host SDK's existing imported module):
+ *
+ * ```javascript
+ * const sdk = require("notifly-kmp-sdk");
+ * const popup = sdk.tech.notifly.kmp.popup;
+ * const input = popup.createPopupRenderInput(
+ *   "ssr", "campaign-id", "user-id", "device-id", "purchase",
+ *   { items: [{ id: "P1", quantity: 2 }], enabled: true, nullable: null },
+ * );
+ * ```
+ *
+ * Pass `input` to `renderer.render(input, onComplete)`. Do not JSON-stringify the event parameters.
  */
 @JsExport
 fun createPopupRenderInput(
