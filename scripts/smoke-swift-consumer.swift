@@ -55,9 +55,8 @@ let staticOutput = renderAndAwait(
 )
 precondition(staticOutput.outcome == "static")
 precondition(staticOutput.html == nil && staticOutput.errorCode == nil && staticOutput.httpStatus == nil)
-staticRenderer.close()
 
-let closedOutput = renderAndAwait(
+let reusedOutput = renderAndAwait(
     renderer: staticRenderer,
     input: PopupRenderInput(
         templateRenderingMode: "static",
@@ -68,7 +67,7 @@ let closedOutput = renderAndAwait(
         eventParams: nil
     )
 )
-precondition(closedOutput.outcome == "failed" && closedOutput.errorCode == "renderer_closed")
+precondition(reusedOutput.outcome == "static")
 
 let cancellableRenderer = PopupFactory.shared.create(
     config: PopupRendererConfig(projectId: "", baseUrl: "not-https", sdkVersion: "")
@@ -93,7 +92,6 @@ precondition(
         (cancelledOrCompleted.outcome == "failed" &&
             cancelledOrCompleted.errorCode == "invalid_configuration")
 )
-cancellableRenderer.close()
 
 /// Captures requests locally so the consumer smoke never contacts a rendering service.
 private final class PopupFixtureProtocol: URLProtocol {
@@ -151,7 +149,6 @@ let renderer = PopupFactory.shared.create(config: PopupRendererConfig(
     baseUrl: "https://render.example",
     sdkVersion: "notifly/ios/test"
 ))
-defer { renderer.close() }
 let params: [String: Any] = [
     "items": [["id": "P1", "quantity": 2]],
     "tags": ["sale", "new"],

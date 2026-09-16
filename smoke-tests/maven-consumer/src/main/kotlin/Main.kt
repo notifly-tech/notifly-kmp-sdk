@@ -41,14 +41,13 @@ fun main() {
         )
     check(static.outcome == "static")
     check(static.html == null && static.errorCode == null && static.httpStatus == null)
-    staticRenderer.close()
 
-    val closed =
+    val reused =
         renderAndAwait(
             staticRenderer,
             PopupRenderInput("static", null, null, null, null, null),
         )
-    check(closed.outcome == "failed" && closed.errorCode == "renderer_closed")
+    check(reused.outcome == "static")
 
     val cancellableRenderer = PopupFactory.create(PopupRendererConfig("", "not-https", ""))
     val cancelledOrCompleted =
@@ -63,5 +62,4 @@ fun main() {
         cancelledOrCompleted.outcome == "cancelled" ||
             (cancelledOrCompleted.outcome == "failed" && cancelledOrCompleted.errorCode == "invalid_configuration"),
     )
-    cancellableRenderer.close()
 }

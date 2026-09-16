@@ -180,6 +180,5 @@ class BrowserFetchEngineTest {
             renderer.render(input) { calls++ }
             runCurrent()
             assertEquals(2, calls)
-            renderer.close()
         }
 }

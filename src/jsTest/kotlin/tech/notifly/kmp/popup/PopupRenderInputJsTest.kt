@@ -30,6 +30,7 @@ class PopupRenderInputJsTest {
     ): PopupRenderOutput {
         var created = 0
         var requests = 0
+        var client: HttpClient? = null
         val renderer =
             createPopupRenderer(
                 PopupRendererConfig("0123456789abcdef0123456789abcdef", "https://render.example", "sdk"),
@@ -45,7 +46,7 @@ class PopupRenderInputJsTest {
                             )
                             respond("", HttpStatusCode.NoContent)
                         },
-                    )
+                    ).also { client = it }
                 },
                 StandardTestDispatcher(testScheduler),
             )
@@ -58,7 +59,7 @@ class PopupRenderInputJsTest {
             assertEquals(if (expectedParams == null) 0 else 1, requests)
             return output
         } finally {
-            renderer.close()
+            client?.close()
         }
     }
 

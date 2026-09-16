@@ -96,8 +96,11 @@ are unsupported. JS numbers keep JavaScript's existing precision; Swift/Kotlin
 64-bit integers are not rounded through `Double` during encoding. Do not mutate
 Kotlin/Swift input collections while a render is pending.
 
-Use `task.cancel()` to cancel one render and `renderer.close()` when releasing the
-owning SDK. Results are delivered asynchronously, with no main-thread guarantee.
+Renderers reuse one lazily initialized HTTP client for the runtime lifetime and
+require no explicit cleanup. Use `task.cancel()` to cancel an individual render;
+this does not close the shared client or affect other requests. Keep each task
+handle if the host needs to cancel work when a popup is dismissed or the SDK is
+reset. Results are delivered asynchronously, with no main-thread guarantee.
 
 ## Platform integration
 

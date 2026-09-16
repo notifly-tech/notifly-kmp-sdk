@@ -77,14 +77,12 @@ try {
   assert.equal(staticOutput.html, null);
   assert.equal(staticOutput.errorCode, null);
   assert.equal(staticOutput.httpStatus, null);
-  staticRenderer.close();
 
-  const closedOutput = await renderAndAwait(
+  const reusedOutput = await renderAndAwait(
     staticRenderer,
     popup.createPopupRenderInput("static", null, null, null, null, null),
   );
-  assert.equal(closedOutput.outcome, "failed");
-  assert.equal(closedOutput.errorCode, "renderer_closed");
+  assert.equal(reusedOutput.outcome, "static");
 
   const cancellableRenderer = popup.PopupFactory.create(new model.PopupRendererConfig("", "not-https", ""));
   const cancelledOrCompleted = await renderAndAwait(
@@ -100,7 +98,6 @@ try {
       (cancelledOrCompleted.outcome === "failed" &&
         cancelledOrCompleted.errorCode === "invalid_configuration"),
   );
-  cancellableRenderer.close();
 
   const originalFetch = globalThis.fetch;
   const requests = [];
@@ -151,7 +148,6 @@ try {
     assert.equal(requests.length, 2);
     assert.deepEqual(requests[1].body.eventParams, { items: [{ id: "P2", quantity: 1 }] });
   } finally {
-    renderer.close();
     globalThis.fetch = originalFetch;
   }
 

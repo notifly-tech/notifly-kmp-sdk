@@ -28,11 +28,9 @@ class PopupRendererTest {
     private val input = PopupRenderInput("ssr", "campaign", "user", "device", "open", emptyMap())
 
     private fun TestScope.renderer(
-        close: () -> Unit = {},
         block: suspend (ValidatedPopupRenderRequest) -> PopupRenderResult = { PopupRenderResult.Rendered("html") },
     ) = PopupRenderer(
         RenderPopupUseCase("0123456789abcdef0123456789abcdef", "sdk", PopupRenderRepository(block)),
-        close,
         StandardTestDispatcher(testScheduler),
     )
 
@@ -45,7 +43,6 @@ class PopupRendererTest {
             assertTrue(outcomes.isEmpty())
             runCurrent()
             task.cancel()
-            renderer.close()
             runCurrent()
             assertEquals(1, outcomes.size)
             assertEquals("rendered", outcomes.single().outcome)
@@ -68,7 +65,6 @@ class PopupRendererTest {
             assertNull(outcomes.single().html)
             assertNull(outcomes.single().httpStatus)
             assertNull(outcomes.single().errorCode)
-            renderer.close()
         }
 
     @Test
@@ -91,25 +87,23 @@ class PopupRendererTest {
             gate.complete(Unit)
             runCurrent()
             assertEquals(listOf("cancelled", "rendered"), outcomes)
-            renderer.close()
         }
 
     @Test
-    fun closeIsIdempotentCancelsPendingAndRejectsFutureStaticCalls() =
+    fun render_afterCancellation_acceptsStaticAndSsrRequests() =
         runTest {
-            var closed = 0
             val outcomes = mutableListOf<PopupRenderOutput>()
-            val renderer = renderer(close = { closed++ }) { awaitCancellation() }
-            renderer.render(input) { outcomes.add(it) }
-            runCurrent()
-            renderer.close()
-            renderer.close()
+            val renderer = renderer()
+
+            val task = renderer.render(input) { outcomes.add(it) }
+            task.cancel()
             assertTrue(outcomes.isEmpty())
             renderer.render(PopupRenderInput(null, null, null, null, null, null)) { outcomes.add(it) }
+            renderer.render(input) { outcomes.add(it) }
             runCurrent()
-            assertEquals(listOf("cancelled", "failed"), outcomes.map { it.outcome })
-            assertEquals("renderer_closed", outcomes.last().errorCode)
-            assertEquals(1, closed)
+
+            assertEquals(listOf("cancelled", "static", "rendered"), outcomes.map { it.outcome })
+            assertEquals("html", outcomes.last().html)
         }
 
     @Test
@@ -134,7 +128,6 @@ class PopupRendererTest {
                 assertFalse(requestCancelled)
             } finally {
                 task.cancel()
-                renderer.close()
                 runCurrent()
             }
             assertTrue(requestCancelled)
@@ -153,7 +146,7 @@ class PopupRendererTest {
                     delay(30000)
                     PopupRenderResult.Rendered("late html")
                 }
-            renderer.render(input) { outcomes.add(it) }
+            val task = renderer.render(input) { outcomes.add(it) }
             try {
                 advanceTimeBy(30000)
                 runCurrent()
@@ -163,7 +156,7 @@ class PopupRendererTest {
                 assertEquals(200, outcomes.single().httpStatus)
                 assertNull(outcomes.single().errorCode)
             } finally {
-                renderer.close()
+                task.cancel()
             }
         }
 
@@ -181,7 +174,6 @@ class PopupRendererTest {
                 runCurrent()
                 advanceTimeBy(20001)
                 task.cancel()
-                renderer.close()
                 runCurrent()
                 assertEquals(code, outcomes.single().errorCode)
                 assertEquals(status, outcomes.single().httpStatus)
@@ -203,12 +195,10 @@ class PopupRendererTest {
             assertEquals(listOf("static", "failed", "skipped"), outcomes.map { it.outcome })
             assertEquals("invalid_request", outcomes[1].errorCode)
             assertEquals(204, outcomes[2].httpStatus)
-            renderer.close()
             val broken = renderer { error("recoverable internal failure") }
             broken.render(input) { outcomes.add(it) }
             runCurrent()
             assertEquals("internal_error", outcomes.last().errorCode)
-            broken.close()
         }
 
     @Test
@@ -223,20 +213,18 @@ class PopupRendererTest {
             renderer.render(input) { calls++ }
             runCurrent()
             assertEquals(2, calls)
-            renderer.close()
         }
 
     @Test
-    fun callbackCanReenterRendererAndCloseOutsideStateLock() =
+    fun render_callbackStartsAnotherRequest_deliversBothResults() =
         runTest {
             val renderer = renderer()
             val outcomes = mutableListOf<String>()
             renderer.render(input) {
                 outcomes.add(it.outcome)
-                renderer.close()
-                renderer.render(input) { closed -> outcomes.add(closed.errorCode!!) }
+                renderer.render(input) { output -> outcomes.add(output.outcome) }
             }
             runCurrent()
-            assertEquals(listOf("rendered", "renderer_closed"), outcomes)
+            assertEquals(listOf("rendered", "rendered"), outcomes)
         }
 }

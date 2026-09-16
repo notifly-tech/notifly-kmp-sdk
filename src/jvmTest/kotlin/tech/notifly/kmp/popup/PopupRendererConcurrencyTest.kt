@@ -21,7 +21,6 @@ class PopupRendererConcurrencyTest {
     private fun renderer(block: suspend () -> PopupRenderResult) =
         PopupRenderer(
             RenderPopupUseCase("0123456789abcdef0123456789abcdef", "sdk", PopupRenderRepository { block() }),
-            {},
             Dispatchers.Default,
         )
 
@@ -29,7 +28,7 @@ class PopupRendererConcurrencyTest {
         PopupRenderInput("ssr", "campaign", "user", "device", "open", params)
 
     @Test
-    fun concurrentCancelCompletionAndCloseDeliverExactlyOnce() =
+    fun render_concurrentCancellationAndCompletion_deliversExactlyOnce() =
         runBlocking {
             repeat(100) {
                 val ready = CompletableDeferred<Unit>()
@@ -49,10 +48,10 @@ class PopupRendererConcurrencyTest {
                     }
                 ready.await()
                 val cancel = launch(Dispatchers.Default) { task.cancel() }
-                val close = launch(Dispatchers.Default) { renderer.close() }
+                val repeatedCancel = launch(Dispatchers.Default) { task.cancel() }
                 release.complete(Unit)
                 cancel.join()
-                close.join()
+                repeatedCancel.join()
                 val result = delivered.await()
                 assertTrue(result.outcome == "cancelled" || result.outcome == "rendered")
                 assertEquals(1, callbacks.get())
@@ -60,17 +59,16 @@ class PopupRendererConcurrencyTest {
         }
 
     @Test
-    fun callbackRunsWithoutHoldingStateLockOnAnotherThread() {
+    fun render_callbackStartsRequestOnAnotherThread_deliversBothResults() {
         val renderer = renderer { PopupRenderResult.Skipped }
         val done = CountDownLatch(1)
         var acquired = false
         renderer.render(input()) {
-            val closed = CountDownLatch(1)
+            val nested = CountDownLatch(1)
             Thread {
-                renderer.close()
-                closed.countDown()
+                renderer.render(input()) { nested.countDown() }
             }.start()
-            acquired = closed.await(2, TimeUnit.SECONDS)
+            acquired = nested.await(2, TimeUnit.SECONDS)
             done.countDown()
         }
         assertTrue(done.await(5, TimeUnit.SECONDS))
@@ -102,7 +100,6 @@ class PopupRendererConcurrencyTest {
                     delivered.complete(Unit)
                 }
             delivered.await()
-            renderer.close()
             handle to listOf(WeakReference<Any>(html), WeakReference<Any>(input), WeakReference(callbackOwner))
         }
 }

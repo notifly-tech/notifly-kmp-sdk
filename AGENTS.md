@@ -36,14 +36,14 @@ This file defines repository conventions for coding agents.
 - Describe parameters and return values in prose where practical. Use `@param` and `@return` only when separate, substantial descriptions improve readability; do not add empty or redundant tags.
 - Document shared contracts on the common declaration or interface. Do not copy the same explanation into every override or platform implementation; document only platform-specific differences there.
 
-For example, document the contract above `PopupRenderer.close()`:
+For example, document the contract above `PopupRenderTask.cancel()`:
 
 ```kotlin
 /**
- * Cancels pending renders and releases owned resources.
+ * Requests cancellation of this render.
  *
- * Subsequent calls to [render] fail with `renderer_closed`.
- * Repeated calls to this method have no additional effect.
+ * Cancellation competes with completion for the first terminal result.
+ * Calls after a terminal result have no additional effect.
  */
 ```
 
@@ -55,10 +55,10 @@ For example, document the contract above `PopupRenderer.close()`:
 - Keep necessary inline comments short and directly above the relevant code. Do not remove useful risk explanations merely to reduce the comment count.
 - Add `TODO` comments only when necessary, with a real issue number or link.
 
-Do not annotate `pending.remove(state)` with `// Remove the request.` A lock ownership precondition belongs above the function:
+Do not annotate `state.callback = null` with `// Clear the callback.` Explain the concurrency contract above the function:
 
 ```kotlin
-/** Settles a request while the caller holds the renderer lock. */
+/** Claims the first terminal result under the request lock, then delivers it outside the lock. */
 ```
 
 ### Maintenance and other languages
@@ -83,7 +83,7 @@ Do not annotate `pending.remove(state)` with `// Remove the request.` A lock own
 - Prefer specific assertions such as `assertEquals(expected, actual)` and `assertNull(actual)` over generic Boolean comparisons.
 - Keep important inputs and expected values visible in the test. Use small setup helpers; do not introduce a shared base class or custom DSL merely to remove duplication.
 - Table-driven cases may share a test when they verify the same behavior. Include a case label or input in failure messages and avoid computing expected results with production logic.
-- Keep tests independent of execution order and shared mutable state. Release clients, renderers, servers, and other resources even when an assertion fails, using `finally` or lifecycle hooks.
+- Keep tests independent of execution order and shared mutable state. Release test-owned clients, servers, and other resources, and cancel pending render tasks even when an assertion fails, using `finally` or lifecycle hooks.
 
 ### Multiplatform and asynchronous tests
 
