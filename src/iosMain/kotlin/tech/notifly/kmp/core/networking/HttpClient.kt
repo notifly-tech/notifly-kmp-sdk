@@ -5,6 +5,12 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import platform.Foundation.*
 
+/**
+ * Creates an isolated Darwin session without cookie storage, saved credentials, or response caching.
+ *
+ * Ktor's Darwin delegate rejects NSURLSession redirects, while shared configuration disables
+ * Ktor-level redirects. Default TLS verification remains enabled.
+ */
 internal actual fun createHttpClient(): HttpClient = HttpClient(Darwin) {
     configureHttpClient()
     engine {
@@ -19,7 +25,5 @@ internal actual fun createHttpClient(): HttpClient = HttpClient(Darwin) {
             setHTTPShouldHandleCookies(false)
             setCachePolicy(NSURLRequestReloadIgnoringLocalCacheData)
         }
-        // Ktor's Darwin delegate rejects NSURLSession redirects; the common client also
-        // disables Ktor-level redirects. Default TLS verification remains enabled.
     }
 }

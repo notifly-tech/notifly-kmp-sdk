@@ -120,8 +120,8 @@ class PopupRenderRepositoryImplTest {
         }
     }
 
+    /** Uses 63 bytes of JSON overhead to exceed the former 256 KiB limit by exactly one byte. */
     @Test fun serializedBodyCanExceedFormerSizeLimit() = runTest {
-        // This wire prefix and closing suffix occupy 63 ASCII bytes.
         val base = input.copy(eventName = "open", eventParamsJson = "{\"x\":\"" + "a".repeat(262082) + "\"}")
         assertEquals(PopupRenderResult.Skipped, execute(base) {
             assertEquals(262145, (it.body as OutgoingContent.ByteArrayContent).bytes().size)

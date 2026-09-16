@@ -9,6 +9,11 @@ import tech.notifly.kmp.popup.domain.usecase.RenderPopupUseCase
 import tech.notifly.kmp.popup.internal.PlatformLock
 import tech.notifly.kmp.popup.model.*
 
+/**
+ * Resolves popup rendering results without displaying UI or loading a WebView.
+ *
+ * Create instances with [PopupFactory.create] and call [close] when the owning SDK releases them.
+ */
 @JsExport
 class PopupRenderer internal constructor(
     private val useCase: RenderPopupUseCase,
@@ -19,6 +24,17 @@ class PopupRenderer internal constructor(
     private val pending = mutableSetOf<Pending>()
     private var closed = false
 
+    /**
+     * Resolves [input] and schedules one terminal result through [onComplete].
+     *
+     * Only the exact mode `ssr` requests server-rendered HTML. Other modes return `static` without
+     * validating the request or accessing the network. A closed renderer instead fails with
+     * `renderer_closed`, regardless of mode.
+     *
+     * Completion, task cancellation, and [close] compete for the first terminal result. The callback
+     * runs asynchronously outside the state lock, with no main-thread guarantee. Callback failures
+     * are contained and do not produce another result.
+     */
     fun render(input: PopupRenderInput, onComplete: (PopupRenderOutput) -> Unit): PopupRenderTask {
         val state = Pending(onComplete)
         val task = PopupRenderTask { finish(state, PopupRenderResult.Cancelled) }
@@ -49,6 +65,12 @@ class PopupRenderer internal constructor(
         return task
     }
 
+    /**
+     * Cancels pending renders and releases owned resources.
+     *
+     * Subsequent calls to [render] fail with `renderer_closed`. Repeated calls have no additional
+     * effect. This method does not wait for callbacks; already settled results are still delivered.
+     */
     fun close() {
         val completions = lock.withLock {
             if (closed) null else {
@@ -65,7 +87,11 @@ class PopupRenderer internal constructor(
         deliver(completion)
     }
 
-    // The caller holds the renderer lock. close settles every pending task in one transition.
+    /**
+     * Claims the first terminal result while the caller holds the renderer lock.
+     *
+     * Keeping delivery separate lets [close] settle all pending requests in one locked transition.
+     */
     private fun settle(state: Pending, proposed: PopupRenderResult): Completion? {
         val callback = state.callback ?: return null
         val completion = Completion(callback, proposed.toOutput(), state.work)
@@ -77,14 +103,17 @@ class PopupRenderer internal constructor(
         return completion
     }
 
+    /**
+     * Delivers a settled result in a job independent of request cancellation and renderer shutdown.
+     *
+     * Callback failures must neither escape into the host nor become a second result. Catching
+     * [Throwable] also contains native JavaScript errors that are not Kotlin exceptions.
+     */
     private fun deliver(completion: Completion) {
         completion.work?.cancel()
-        // This delivery job is independent of the request job, including cancel and close.
         CoroutineScope(dispatcher).launch {
             yield()
             try { completion.callback(completion.output) } catch (error: Throwable) {
-                // A caller exception must neither escape into the host nor become a second result.
-                // Native JS Error objects are Throwables but not Kotlin Exceptions.
             }
         }
     }

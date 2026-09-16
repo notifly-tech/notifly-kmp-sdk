@@ -11,6 +11,7 @@ internal sealed class PopupRequestEncoding {
 internal object PopupRenderRequestDto {
     private val number = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
 
+    /** Encodes event parameters as a JSON object, using `{}` for null and rejecting malformed input. */
     fun encode(request: ValidatedPopupRenderRequest): PopupRequestEncoding {
         val raw = request.eventParamsJson ?: "{}"
         if (!hasValidPrimitiveTokens(raw)) return PopupRequestEncoding.Invalid("invalid_request")
@@ -24,8 +25,12 @@ internal object PopupRenderRequestDto {
         return PopupRequestEncoding.Body(body)
     }
 
-    // Validate every original token before JsonObject can overwrite duplicate keys.
-    // The serialization parser still owns JSON structure, keys, and escape syntax.
+    /**
+     * Checks original primitive tokens before [JsonObject] can overwrite duplicate keys.
+     *
+     * Otherwise, a later valid value could hide an invalid token. The serialization parser still
+     * validates JSON structure, keys, and escape syntax.
+     */
     private fun hasValidPrimitiveTokens(raw: String): Boolean {
         var inString = false
         var escaped = false

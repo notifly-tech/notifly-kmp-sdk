@@ -8,7 +8,11 @@ internal enum class PopupRenderingMode {
     }
 }
 
-// ECMAScript WhiteSpace + LineTerminator. Kotlin trim() differs for BOM and control characters.
+/**
+ * Trims ECMAScript WhiteSpace and LineTerminator characters consistently across platforms.
+ *
+ * Kotlin's default trimming differs for the byte order mark and some control characters.
+ */
 internal fun String.trimJsWhitespace(): String = trim {
     it in '\u0009'..'\u000D' || it == '\u0020' || it == '\u00A0' || it == '\u1680' ||
         it in '\u2000'..'\u200A' || it == '\u2028' || it == '\u2029' || it == '\u202F' ||

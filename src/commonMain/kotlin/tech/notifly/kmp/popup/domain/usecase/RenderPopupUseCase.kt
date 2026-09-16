@@ -8,6 +8,12 @@ import tech.notifly.kmp.popup.domain.model.trimJsWhitespace
 import tech.notifly.kmp.popup.domain.repository.PopupRenderRepository
 
 internal class RenderPopupUseCase(private val projectId: String, private val sdkVersion: String, private val repository: PopupRenderRepository) {
+    /**
+     * Bypasses static requests and validates SSR configuration and identifiers before repository access.
+     *
+     * Dot-only user and campaign IDs are rejected because URL parsers normalize complete dot segments
+     * even when percent-encoded. Event JSON validation belongs to the repository's encoding boundary.
+     */
     suspend fun render(request: PopupRenderRequest): PopupRenderResult {
         if (PopupRenderingMode.from(request.templateRenderingMode) == PopupRenderingMode.STATIC) return PopupRenderResult.Static
         val header = sdkVersion.trimJsWhitespace()
@@ -26,7 +32,6 @@ internal class RenderPopupUseCase(private val projectId: String, private val sdk
         ) {
             return PopupRenderResult.Failed("invalid_request")
         }
-        // URL parsers normalize complete dot segments even when the dots are percent-encoded.
         if (user == "." || user == ".." || campaign == "." || campaign == "..") {
             return PopupRenderResult.Failed("invalid_request")
         }

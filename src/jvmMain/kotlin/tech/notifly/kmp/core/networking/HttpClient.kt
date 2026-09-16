@@ -8,6 +8,12 @@ import okhttp3.CookieJar
 import okhttp3.RequestBody
 import okio.BufferedSink
 
+/**
+ * Creates an OkHttp transport with retries, redirects, cookies, caching, and authentication disabled.
+ *
+ * Request bodies are marked one-shot because disabling connection retries alone does not prevent
+ * OkHttp from replaying a byte-array POST after HTTP 503 with `Retry-After: 0`.
+ */
 internal actual fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
     configureHttpClient()
     engine {
@@ -19,8 +25,6 @@ internal actual fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
             cache(null)
             authenticator(Authenticator.NONE)
             proxyAuthenticator(Authenticator.NONE)
-            // OkHttp may otherwise replay a byte-array POST for 503 + Retry-After: 0,
-            // even when connection retries are disabled.
             addInterceptor { chain ->
                 val request = chain.request()
                 val body = request.body

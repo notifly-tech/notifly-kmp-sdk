@@ -22,6 +22,13 @@ internal actual fun createHttpClient(): HttpClient = HttpClient(BrowserFetchEngi
 
 internal class BrowserFetchEngine(private val fetch: (String, dynamic) -> Promise<dynamic>) : HttpClientEngineBase("notifly-fetch") {
     override val config = HttpClientEngineConfig()
+    /**
+     * Fetches a complete response without credentials, caching, or redirects.
+     *
+     * Cancellation remains attached through body reading, not just header receipt. The controller
+     * is aborted on every exit, including cancellation or rejection of either awaited promise.
+     * Native JavaScript errors are normalized at this boundary without exposing URL or body details.
+     */
     override suspend fun execute(data: HttpRequestData): HttpResponseData {
         val context = callContext()
         val requestTime = GMTDate()
@@ -49,7 +56,6 @@ internal class BrowserFetchEngine(private val fetch: (String, dynamic) -> Promis
             val responseHeaders = Headers.build {
                 raw.headers.forEach { value: String, name: String -> append(name, value) }
             }
-            // Keep cancellation attached until the entire body is available, not just headers.
             val buffer = raw.arrayBuffer().unsafeCast<Promise<ArrayBuffer>>().await()
             return HttpResponseData(
                 HttpStatusCode.fromValue(status), requestTime, responseHeaders, HttpProtocolVersion.HTTP_1_1,
@@ -58,11 +64,8 @@ internal class BrowserFetchEngine(private val fetch: (String, dynamic) -> Promis
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            // Browser fetch rejects native JS Error objects, which are not Kotlin Exceptions.
-            // Normalize at this foreign-runtime boundary and do not expose URL/body details.
             throw IllegalStateException("Browser HTTP transport failed")
         } finally {
-            // Also runs when either Promise await is cancelled or rejects.
             controller.abort()
         }
     }

@@ -63,6 +63,7 @@ internal class PopupRenderRepositoryImpl(private val baseUrl: String, private va
         }
     }
 
+    /** Validates the injected HTTPS origin before constructing an endpoint or obtaining a client. */
     private fun parseOrigin(): Url? {
         if (!baseUrl.startsWith("https://", ignoreCase = true) || baseUrl.any { it <= ' ' || it == '\\' || it == '@' || it == '?' || it == '#' }) return null
         if (baseUrl.substringAfter("://").substringBefore('/').isEmpty()) return null
@@ -74,6 +75,7 @@ internal class PopupRenderRepositoryImpl(private val baseUrl: String, private va
         } catch (error: Exception) { null }
     }
 
+    /** Encodes an original identifier as one UTF-8 path segment without interpreting existing escapes. */
     private fun segment(value: String): String = buildString {
         for (byte in value.encodeToByteArray()) {
             val code = byte.toInt() and 255
