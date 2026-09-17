@@ -32,12 +32,22 @@ jobs:
       - name: Verify SDK submodule update workflow
         run: ruby scripts/test-sdk-bump-workflow.rb
 
+      - name: Check Kotlin style
+        run: ./gradlew ktlintCheck --no-daemon
+
       - name: Test common code
         run: |
           ./gradlew \
             jvmTest \
             jsNodeTest \
             iosSimulatorArm64Test \
+            --no-daemon
+
+      - name: Test browser HTTP boundary
+        run: |
+          ./gradlew \
+            jsBrowserTest \
+            --tests '*BrowserHttpIntegrationTest*' \
             --no-daemon
 
       - name: Build artifacts

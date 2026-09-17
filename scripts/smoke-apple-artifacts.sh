@@ -12,6 +12,8 @@ if [[ ! -d "$framework_dir" ]]; then
   exit 1
 fi
 
+"$root_dir/scripts/smoke-swift-consumer.sh"
+
 cp "$root_dir/NotiflyKMP.podspec" "$root_dir/LICENSE" "$stage_dir/"
 cp -R "$framework_dir" "$stage_dir/"
 

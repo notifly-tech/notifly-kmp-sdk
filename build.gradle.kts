@@ -1,13 +1,30 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.jvm.tasks.Jar
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
     kotlin("multiplatform") version "2.2.21"
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("dev.petuska.npm.publish") version "3.5.3"
     `maven-publish`
     signing
+}
+
+ktlint {
+    version.set("1.8.0")
+    outputToConsole.set(true)
+    kotlinScriptAdditionalPaths {
+        include(
+            fileTree("smoke-tests") {
+                include("**/*.kt", "**/*.kts")
+                exclude("**/build/**", "**/.gradle/**")
+            },
+        )
+    }
+    filter {
+        exclude("**/build/**", "**/.gradle/**", "**/.worktrees/**")
+    }
 }
 
 group = providers.environmentVariable("GROUP").getOrElse("tech.notifly")
@@ -17,9 +34,11 @@ val mavenRootArtifactId = providers.environmentVariable("MAVEN_ROOT_ARTIFACT_ID"
 val mavenJvmArtifactId = providers.environmentVariable("MAVEN_JVM_ARTIFACT_ID").getOrElse("notifly-kmp-sdk-jvm")
 val npmPackageName = providers.environmentVariable("NPM_PACKAGE_NAME").getOrElse("notifly-kmp-sdk")
 val appleFrameworkName = providers.environmentVariable("APPLE_FRAMEWORK_NAME").getOrElse("NotiflyKMP")
-val appleFrameworkIsStatic = providers.environmentVariable("APPLE_FRAMEWORK_IS_STATIC")
-    .map(String::toBooleanStrict)
-    .getOrElse(true)
+val appleFrameworkIsStatic =
+    providers
+        .environmentVariable("APPLE_FRAMEWORK_IS_STATIC")
+        .map(String::toBooleanStrict)
+        .getOrElse(true)
 
 kotlin {
     compilerOptions {
@@ -31,7 +50,18 @@ kotlin {
     jvm()
 
     js(IR) {
-        nodejs()
+        nodejs {
+            testTask {
+                filter.excludeTestsMatching("*BrowserHttpIntegrationTest*")
+            }
+        }
+        browser {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
         binaries.library()
         generateTypeScriptDefinitions()
     }
@@ -52,10 +82,14 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api("org.jetbrains.kotlin:kotlin-stdlib-common:1.8.10")
+            implementation("io.ktor:ktor-client-core:2.3.13")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
         }
 
         jvmMain.dependencies {
             api("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
+            implementation("io.ktor:ktor-client-okhttp:2.3.13")
         }
 
         jsMain.dependencies {
@@ -63,8 +97,18 @@ kotlin {
             api(kotlin("stdlib-js"))
         }
 
+        iosMain.dependencies {
+            implementation("io.ktor:ktor-client-darwin:2.3.13")
+        }
+
+        jvmTest.dependencies {
+            implementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.1")
+            implementation("io.ktor:ktor-client-mock:2.3.13")
         }
     }
 }
@@ -99,11 +143,12 @@ val centralPublicationNames = setOf("kotlinMultiplatform", "jvm")
 publishing {
     publications.withType<MavenPublication>().configureEach {
         if (name in centralPublicationNames) {
-            artifactId = if (name == "kotlinMultiplatform") {
-                mavenRootArtifactId
-            } else {
-                mavenJvmArtifactId
-            }
+            artifactId =
+                if (name == "kotlinMultiplatform") {
+                    mavenRootArtifactId
+                } else {
+                    mavenJvmArtifactId
+                }
             artifact(emptyJavadocJar)
             pom {
                 name.set("Notifly KMP SDK")
@@ -140,10 +185,19 @@ publishing {
     repositories {
         maven {
             name = "centralStaging"
-            url = uri(
-                providers.environmentVariable("CENTRAL_STAGING_REPOSITORY")
-                    .getOrElse(rootProject.layout.buildDirectory.dir("central-staging").get().asFile.toURI().toString()),
-            )
+            url =
+                uri(
+                    providers
+                        .environmentVariable("CENTRAL_STAGING_REPOSITORY")
+                        .getOrElse(
+                            rootProject.layout.buildDirectory
+                                .dir("central-staging")
+                                .get()
+                                .asFile
+                                .toURI()
+                                .toString(),
+                        ),
+                )
         }
     }
 }
