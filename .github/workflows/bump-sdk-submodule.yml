@@ -27,7 +27,7 @@ jobs:
   bump:
     if: github.repository == 'notifly-tech/notifly-kmp-sdk' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: ${{ inputs.sdk_repository == 'team-michael/notifly-js-sdk' && 20 || 10 }}
     defaults:
       run:
         shell: bash
@@ -100,13 +100,41 @@ jobs:
           git -C notifly-kmp-sdk checkout --detach "$next_sha"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Java for the JS Core build
+        if: steps.bump.outputs.changed == 'true' && inputs.sdk_repository == 'team-michael/notifly-js-sdk'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node.js for the JS lockfile
+        if: steps.bump.outputs.changed == 'true' && inputs.sdk_repository == 'team-michael/notifly-js-sdk'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Pin npm for reproducible lockfile updates
+        id: setup-npm
+        if: steps.bump.outputs.changed == 'true' && inputs.sdk_repository == 'team-michael/notifly-js-sdk'
+        run: npm install --global npm@10.9.0 --ignore-scripts --no-audit --no-fund
+
+      - name: Refresh the JS lockfile from the updated Core package
+        id: js-lockfile
+        if: steps.bump.outputs.changed == 'true' && inputs.sdk_repository == 'team-michael/notifly-js-sdk'
+        run: |
+          npm run build:kmp-core
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
       - name: Create or update the KMP bump PR
         if: steps.bump.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           # GITHUB_TOKEN-created pushes do not trigger the normal SDK CI workflows.
           token: ${{ secrets.SDK_REPO_TOKEN }}
-          add-paths: notifly-kmp-sdk
+          add-paths: |
+            notifly-kmp-sdk
+            ${{ inputs.sdk_repository == 'team-michael/notifly-js-sdk' && 'package-lock.json' || '' }}
           base: main
           branch: automation/bump-kmp-${{ inputs.kmp_version }}
           delete-branch: false
@@ -119,5 +147,6 @@ jobs:
             - New commit: `${{ steps.bump.outputs.next_sha }}`
             - [Review KMP changes](https://github.com/notifly-tech/notifly-kmp-sdk/compare/${{ steps.bump.outputs.previous_sha }}...${{ steps.bump.outputs.next_sha }})
 
-            Only the submodule pointer changes. SDK versions are unchanged.
+            Updates the submodule pointer and, for the JS SDK, regenerates `package-lock.json` from the updated Core package.
+            Generated build artifacts are excluded. SDK versions are unchanged.
             Review and merge after SDK CI passes; this workflow does not merge or release SDKs.

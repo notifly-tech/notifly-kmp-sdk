@@ -4,6 +4,7 @@ require 'minitest/autorun'
 require 'open3'
 require 'tmpdir'
 require 'fileutils'
+require 'json'
 
 class KmpBumpWorkflowTest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
@@ -73,7 +74,9 @@ class KmpBumpWorkflowTest < Minitest::Test
   end
 
   def step(workflow, id)
-    workflow.fetch('jobs').fetch('bump').fetch('steps').find { |item| item['id'] == id }.fetch('run')
+    item = workflow.fetch('jobs').fetch('bump').fetch('steps').find { |candidate| candidate['id'] == id }
+    assert item, "Missing workflow step: #{id}"
+    item.fetch('run')
   end
 
   def run_step(workflow, id, extra = {})
@@ -95,7 +98,10 @@ class KmpBumpWorkflowTest < Minitest::Test
     assert_match(/@[0-9a-f]{40}\z/, action.fetch('uses'))
     assert_equal "steps.bump.outputs.changed == 'true'", action.fetch('if')
     assert_equal '${{ secrets.SDK_REPO_TOKEN }}', action.dig('with', 'token')
-    assert_equal 'notifly-kmp-sdk', action.dig('with', 'add-paths')
+    assert_equal [
+      'notifly-kmp-sdk',
+      "${{ inputs.sdk_repository == 'team-michael/notifly-js-sdk' && 'package-lock.json' || '' }}"
+    ], action.dig('with', 'add-paths').lines.map(&:strip)
     assert_equal 'main', action.dig('with', 'base')
     assert_equal 'automation/bump-kmp-${{ inputs.kmp_version }}', action.dig('with', 'branch')
     assert_equal false, action.dig('with', 'delete-branch')
@@ -183,5 +189,97 @@ class KmpBumpWorkflowTest < Minitest::Test
     success, output = run_step(workflow, 'bump')
     refute success, output
     assert_equal @old, git(File.join(@host, 'notifly-kmp-sdk'), 'rev-parse', 'HEAD').strip
+  end
+
+  def test_lockfileRefresh_changedJsSdk_runsBetweenBumpAndPr
+    steps = workflow.fetch('jobs').fetch('bump').fetch('steps')
+    refresh = steps.find { |item| item['id'] == 'js-lockfile' }
+    assert refresh, 'JS SDK updates must refresh the lockfile before creating a PR'
+    condition = "steps.bump.outputs.changed == 'true' && inputs.sdk_repository == 'team-michael/notifly-js-sdk'"
+    assert_equal condition, refresh.fetch('if')
+    refute refresh.fetch('continue-on-error', false)
+    java = steps.find { |item| item.fetch('uses', '').start_with?('actions/setup-java@') }
+    node = steps.find { |item| item.fetch('uses', '').start_with?('actions/setup-node@') }
+    npm = steps.find { |item| item['id'] == 'setup-npm' }
+    assert java, 'JS builds require Java'
+    assert node, 'Lockfile generation requires Node.js'
+    assert npm, 'Lockfile generation requires a pinned npm version'
+    [java, node, npm].each { |setup| assert_equal condition, setup.fetch('if') }
+    assert_equal '17', java.dig('with', 'java-version')
+    bump_index = steps.index { |item| item['id'] == 'bump' }
+    pr_index = steps.index { |item| item.fetch('uses', '').start_with?('peter-evans/create-pull-request@') }
+    assert_operator bump_index, :<, steps.index(java)
+    assert_operator bump_index, :<, steps.index(node)
+    assert_operator steps.index(java), :<, steps.index(refresh)
+    assert_operator steps.index(node), :<, steps.index(refresh)
+    assert_operator steps.index(node), :<, steps.index(npm)
+    assert_operator steps.index(npm), :<, steps.index(refresh)
+    assert_operator steps.index(refresh), :<, pr_index
+  end
+
+  def prepare_js_fixture
+    @env.merge!('npm_config_cache' => File.join(@tmp, 'npm-cache'), 'npm_config_offline' => 'true')
+    FileUtils.mkdir_p([File.join(@host, 'build/notifly-core-sdk'), File.join(@host, 'runtime')])
+    File.write(File.join(@host, 'runtime/package.json'), JSON.generate(name: 'fixture-runtime', version: '1.0.0'))
+    File.write(File.join(@host, 'build/notifly-core-sdk/package.json'), JSON.generate(name: 'notifly-core-sdk', version: '2.21.0'))
+    File.write(File.join(@host, 'package.json'), JSON.generate(
+      name: 'fixture-sdk', version: '2.21.0', private: true,
+      workspaces: ['build/notifly-core-sdk'], dependencies: {'notifly-core-sdk' => '2.21.0'},
+      scripts: {'build:kmp-core' => 'node build-core.cjs', 'preinstall' => 'exit 79'}
+    ))
+    File.write(File.join(@host, 'build-core.cjs'), <<~'JS')
+      const fs = require('node:fs');
+      if (process.env.FAIL_CORE_BUILD === 'true') process.exit(42);
+      if (fs.readFileSync('notifly-kmp-sdk/policy.txt', 'utf8') !== 'released\n') process.exit(43);
+      fs.writeFileSync('build/notifly-core-sdk/package.json', JSON.stringify({
+        name: 'notifly-core-sdk', version: '2.21.0',
+        dependencies: {'fixture-runtime': 'file:../../runtime'}
+      }));
+    JS
+    out, err, status = Open3.capture3(@env, 'npm', 'install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', chdir: @host)
+    assert status.success?, out + err
+    @original_manifest = File.read(File.join(@host, 'package.json'))
+    @original_lockfile = File.read(File.join(@host, 'package-lock.json'))
+    git(@host, 'add', 'package.json', 'package-lock.json', 'build-core.cjs', 'runtime')
+    git(@host, 'commit', '-m', 'JS fixture with old Core lockfile')
+    success, output = run_step(workflow, 'bump')
+    assert success, output
+  end
+
+  def test_lockfileRefresh_newCoreDependency_supportsCleanInstall
+    prepare_js_fixture
+
+    success, output = run_step(workflow, 'js-lockfile')
+
+    assert success, output
+    lockfile = JSON.parse(File.read(File.join(@host, 'package-lock.json')))
+    assert_equal({'fixture-runtime' => 'file:../../runtime'}, lockfile.dig('packages', 'build/notifly-core-sdk', 'dependencies'))
+    assert_equal @original_manifest, File.read(File.join(@host, 'package.json'))
+    assert_equal %w[notifly-kmp-sdk package-lock.json], git(@host, 'diff', '--name-only').lines.map(&:strip)
+    refute Dir.exist?(File.join(@host, 'node_modules')), 'Lockfile refresh must not install packages'
+    out, err, status = Open3.capture3(@env, 'npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund', chdir: @host)
+    assert status.success?, out + err
+  end
+
+  def test_lockfileRefresh_coreBuildFails_preservesLockfile
+    prepare_js_fixture
+
+    success, output = run_step(workflow, 'js-lockfile', 'FAIL_CORE_BUILD' => 'true')
+
+    refute success, output
+    assert_equal @original_lockfile, File.read(File.join(@host, 'package-lock.json'))
+  end
+
+  def test_lockfileRefresh_npmResolutionFails_stopsWorkflow
+    prepare_js_fixture
+    manifest = JSON.parse(@original_manifest)
+    manifest['dependencies']['missing-fixture'] = 'file:missing-package.tgz'
+    File.write(File.join(@host, 'package.json'), JSON.generate(manifest))
+
+    success, output = run_step(workflow, 'js-lockfile')
+
+    refute success, output
+    assert_includes output, 'ENOENT'
+    assert_equal @original_lockfile, File.read(File.join(@host, 'package-lock.json'))
   end
 end
