@@ -69,6 +69,58 @@ class RenderPopupUseCaseTest {
         }
 
     @Test
+    fun render_identifiersAtLengthLimits_passesNormalizedValuesToRepository() =
+        runTest {
+            val user = "u".repeat(255)
+            val device = "d".repeat(255)
+            val campaign = "c".repeat(1024)
+            val event = "e".repeat(255)
+            val useCase =
+                RenderPopupUseCase(
+                    project,
+                    "sdk",
+                    PopupRenderRepository { request ->
+                        assertEquals(user, request.notiflyUserId)
+                        assertEquals(device, request.deviceId)
+                        assertEquals(campaign, request.campaignId)
+                        assertEquals(event, request.eventName)
+                        PopupRenderResult.Skipped
+                    },
+                )
+
+            val result =
+                useCase.render(
+                    input.copy(
+                        notiflyUserId = " $user ",
+                        deviceId = " $device ",
+                        campaignId = " $campaign ",
+                        eventName = event,
+                    ),
+                )
+
+            assertEquals(PopupRenderResult.Skipped, result)
+        }
+
+    @Test
+    fun render_sdkVersionAtLengthLimit_passesTrimmedHeaderToRepository() =
+        runTest {
+            val version = "v".repeat(64)
+            val useCase =
+                RenderPopupUseCase(
+                    project,
+                    "\uFEFF $version \u00A0",
+                    PopupRenderRepository { request ->
+                        assertEquals(version, request.sdkVersion)
+                        PopupRenderResult.Skipped
+                    },
+                )
+
+            val result = useCase.render(input)
+
+            assertEquals(PopupRenderResult.Skipped, result)
+        }
+
+    @Test
     fun render_paddedIdentifiers_normalizesIdsAndPreservesEvent() =
         runTest {
             val params = mapOf("big" to 9007199254740993L)

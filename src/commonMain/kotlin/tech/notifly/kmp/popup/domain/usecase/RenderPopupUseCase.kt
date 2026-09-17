@@ -25,10 +25,8 @@ internal class RenderPopupUseCase(
         ) {
             return PopupRenderResult.Static
         }
-        val header = sdkVersion.trimJsWhitespace()
-        if (!Regex("[0-9a-f]{32}").matches(projectId) || header.length !in 1..64 || '\r' in sdkVersion ||
-            '\n' in sdkVersion
-        ) {
+        val header = parseSdkVersion(sdkVersion)
+        if (!Regex("[0-9a-f]{32}").matches(projectId) || header == null) {
             return PopupRenderResult.Failed("invalid_configuration")
         }
         val user = request.notiflyUserId?.trimJsWhitespace()
@@ -37,10 +35,10 @@ internal class RenderPopupUseCase(
         val event = request.eventName
         if (
             request.hasInvalidEventParams ||
-            user == null || user.length !in 1..255 ||
-            device == null || device.length !in 1..255 ||
-            campaign == null || campaign.length !in 1..1024 ||
-            event == null || event.length !in 1..255 || event.isJsBlank()
+            user == null || !isValidUserIdLength(user) ||
+            device == null || !isValidDeviceIdLength(device) ||
+            campaign == null || !isValidCampaignIdLength(campaign) ||
+            event == null || !isValidEventNameLength(event) || event.isJsBlank()
         ) {
             return PopupRenderResult.Failed("invalid_request")
         }
@@ -50,5 +48,19 @@ internal class RenderPopupUseCase(
         return repository.render(
             ValidatedPopupRenderRequest(projectId, header, campaign, user, device, event, request.eventParams),
         )
+    }
+
+    private fun isValidUserIdLength(userId: String): Boolean = userId.length in 1..255
+
+    private fun isValidDeviceIdLength(deviceId: String): Boolean = deviceId.length in 1..255
+
+    private fun isValidCampaignIdLength(campaignId: String): Boolean = campaignId.length in 1..1024
+
+    private fun isValidEventNameLength(eventName: String): Boolean = eventName.length in 1..255
+
+    /** Normalizes the SDK header, rejecting invalid lengths and line breaks in the original value. */
+    private fun parseSdkVersion(value: String): String? {
+        val header = value.trimJsWhitespace()
+        return header.takeIf { it.length in 1..64 && '\r' !in value && '\n' !in value }
     }
 }

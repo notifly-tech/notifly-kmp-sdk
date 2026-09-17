@@ -12,13 +12,16 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteChannel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import tech.notifly.kmp.popup.domain.model.PopupRenderResult
 import tech.notifly.kmp.popup.domain.model.ValidatedPopupRenderRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class PopupRenderRepositoryImplTest {
     private val input =
@@ -285,6 +288,17 @@ class PopupRenderRepositoryImplTest {
                 PopupRenderResult.Failed("invalid_request"),
                 repository.render(input.copy(eventParams = params)),
             )
+        }
+
+    @Test
+    fun render_cancellation_rethrowsOriginalException() =
+        runTest {
+            val cancellation = CancellationException("Request cancelled")
+            val repository = PopupRenderRepositoryImpl("https://render.example") { throw cancellation }
+
+            val thrown = assertFailsWith<CancellationException> { repository.render(input) }
+
+            assertSame(cancellation, thrown)
         }
 
     @Test

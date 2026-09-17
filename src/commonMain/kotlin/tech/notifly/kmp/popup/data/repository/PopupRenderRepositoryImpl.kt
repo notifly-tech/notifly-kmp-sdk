@@ -1,9 +1,6 @@
 package tech.notifly.kmp.popup.data.repository
 
 import io.ktor.client.HttpClient
-import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.network.sockets.SocketTimeoutException
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.accept
 import io.ktor.client.request.header
 import io.ktor.client.request.preparePost
@@ -12,13 +9,13 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.URLBuilder
-import io.ktor.http.URLProtocol
-import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.http.encodedPath
-import kotlinx.coroutines.CancellationException
 import tech.notifly.kmp.core.networking.encodePathSegment
+import tech.notifly.kmp.core.networking.networkErrorCode
+import tech.notifly.kmp.core.networking.parseHttpsOrigin
 import tech.notifly.kmp.core.util.isJsBlank
+import tech.notifly.kmp.popup.data.mapper.popupRenderErrorCode
 import tech.notifly.kmp.popup.data.model.PopupRenderRequestDto
 import tech.notifly.kmp.popup.data.model.PopupRequestEncoding
 import tech.notifly.kmp.popup.domain.model.PopupRenderResult
@@ -30,7 +27,7 @@ internal class PopupRenderRepositoryImpl(
     private val client: () -> HttpClient,
 ) : PopupRenderRepository {
     override suspend fun render(request: ValidatedPopupRenderRequest): PopupRenderResult {
-        val origin = parseOrigin() ?: return PopupRenderResult.Failed("invalid_configuration")
+        val origin = parseHttpsOrigin(baseUrl) ?: return PopupRenderResult.Failed("invalid_configuration")
         val encoded = PopupRenderRequestDto.encode(request)
         if (encoded is PopupRequestEncoding.Invalid) return PopupRenderResult.Failed(encoded.errorCode)
         val body = (encoded as PopupRequestEncoding.Body).json
@@ -68,50 +65,12 @@ internal class PopupRenderRepositoryImpl(
                         }
 
                         else -> {
-                            PopupRenderResult.Failed(
-                                when (status) {
-                                    400 -> "invalid_request"
-                                    404 -> "popup_not_found"
-                                    408 -> "request_timeout"
-                                    413 -> "payload_too_large"
-                                    422 -> "invalid_popup_template"
-                                    500 -> "internal_server_error"
-                                    504 -> "popup_render_timeout"
-                                    else -> "unexpected_http_status"
-                                },
-                                status,
-                            )
+                            PopupRenderResult.Failed(popupRenderErrorCode(status), status)
                         }
                     }
                 }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: HttpRequestTimeoutException) {
-            PopupRenderResult.Failed("client_timeout")
-        } catch (error: ConnectTimeoutException) {
-            PopupRenderResult.Failed("client_timeout")
-        } catch (error: SocketTimeoutException) {
-            PopupRenderResult.Failed("client_timeout")
         } catch (error: Exception) {
-            PopupRenderResult.Failed("network_error")
-        }
-    }
-
-    /** Validates the injected HTTPS origin before constructing an endpoint or obtaining a client. */
-    private fun parseOrigin(): Url? {
-        if (!baseUrl.startsWith("https://", ignoreCase = true) ||
-            baseUrl.any { it <= ' ' || it == '\\' || it == '@' || it == '?' || it == '#' }
-        ) {
-            return null
-        }
-        if (baseUrl.substringAfter("://").substringBefore('/').isEmpty()) return null
-        return try {
-            Url(baseUrl).takeIf {
-                it.protocol == URLProtocol.HTTPS && it.host.isNotEmpty() && it.port == 443 &&
-                    it.user == null && it.password == null && (it.encodedPath.isEmpty() || it.encodedPath == "/")
-            }
-        } catch (error: Exception) {
-            null
+            PopupRenderResult.Failed(networkErrorCode(error))
         }
     }
 }

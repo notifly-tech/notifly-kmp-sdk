@@ -24,7 +24,7 @@ The main package layout is:
 tech/notifly/kmp/
   core/
     concurrency/      Platform-independent locking contract and platform implementations
-    networking/       HTTP client lifecycle, transport configuration, and URL utilities
+    networking/       HTTP client lifecycle, transport configuration, URL utilities, and transport error classification
     util/             Reusable string, JSON, and platform-specific JS value utilities
   identity/           Shared user ID transition decisions
   popup/
@@ -37,6 +37,7 @@ tech/notifly/kmp/
       repository/     Repository contracts required by use cases
       usecase/        Rendering decisions and shared request validation
     data/
+      mapper/         Popup-specific HTTP status mapping
       model/          HTTP request DTOs and encoding
       repository/     Repository implementations and HTTP response mapping
 ```
@@ -58,7 +59,7 @@ This is a package overview across source sets. Platform infrastructure files kee
 - `PopupFactory` is the composition root: it connects `PopupRenderer`, `RenderPopupUseCase`, and `PopupRenderRepositoryImpl`, supplying the client provider and dispatcher. Host SDKs should not assemble these internal dependencies themselves.
 - `PopupRenderer` adapts public input/output and coordinates completion and cancellation. Rendering rules belong in `RenderPopupUseCase`, not in the facade.
 - `domain` depends on its own models and repository interfaces, and may use pure shared utilities. It must not depend on `data`, Ktor, platform engines, or public facade models.
-- `data` implements the domain repository contract. API requests belong in the repository implementation; serialization belongs in its DTOs. Keep endpoint construction, origin validation, HTTP status mapping, and transport error handling here.
+- `data` implements the domain repository contract. API requests belong in the repository implementation; serialization belongs in its DTOs. Keep endpoint construction, origin-validation failure handling, successful response validation, and result construction in the repository. Popup-specific HTTP status mapping belongs in `data/mapper`; reusable URL validation and transport exception classification belong in `core/networking`. Transport helpers must preserve coroutine cancellation rather than converting it to a failure code.
 - `core` provides reusable infrastructure without depending on `popup` or `identity`. It is a package, not a DI container or a separate module.
 - `identity` remains an independent feature that returns user ID transition decisions; the host SDK applies the resulting side effects.
 
