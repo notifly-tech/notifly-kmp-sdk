@@ -31,14 +31,14 @@ The Swift, JS, and JVM consumer tests are not end-to-end tests against the stagi
 | File | Purpose | Automated execution |
 | --- | --- | --- |
 | [test-release-contracts.rb](test-release-contracts.rb) | Reads workflow and configuration files to enforce release rules: package names, required verification steps, matching checksums, platform SDK update jobs, and the prohibition on publishing directly to npm, CocoaPods, or JitPack from this repository. | CI |
-| [test-sdk-bump-workflow.rb](test-sdk-bump-workflow.rb) | Tests the SDK's KMP submodule update workflow using temporary Git repositories and a stub GitHub CLI. Checks that only valid release tags and target repositories are accepted and only the submodule reference changes. Does not modify real SDK repositories or create PRs. | CI |
+| [test-sdk-bump-workflow.rb](test-sdk-bump-workflow.rb) | Tests the SDK's KMP submodule update workflow using temporary Git repositories and a stub GitHub CLI. Validates release tags, target repositories, and PR file boundaries. Uses real npm with local fixtures to verify JS lockfile updates and failure handling. Does not modify real SDK repositories or create PRs. | CI |
 | [test-swift-consumer-cleanup.rb](test-swift-consumer-cleanup.rb) | Uses a stub `xcrun` to test simulator cleanup in the Swift runner. Covers success, boot failure, boot-status wait failure, and use of an already-booted device. Does not boot a real simulator. | Manual only; not connected to CI |
 
 ## Prerequisites
 
 - JVM builds: JDK 17 and the repository's Gradle Wrapper.
 - JS package validation: Node.js 22 and npm. The script runs `npm install` inside a temporary project.
-- Ruby tests: Ruby with the required libraries, including `yaml` and `minitest`. The SDK update tests also require Git.
+- Ruby tests: Ruby with the required libraries, including `yaml` and `minitest`. The SDK update tests also require Git, Node.js 22, and npm. Their npm fixtures run offline without registry downloads.
 - Apple validation: macOS, Xcode 16 or later, CocoaPods, and an available iPhone simulator. The Swift consumer runner currently builds an `arm64` simulator binary.
 - Initial builds and dependency installation may require network access.
 
@@ -104,6 +104,6 @@ scripts/update_release_manifests.rb "$KMP_SCRIPT_VERSION" "$KMP_SCRIPT_CHECKSUM"
 
 - [CI workflow](../.github/workflows/ci.yml): Verification for PRs and pushes to main.
 - [Release workflow](../.github/workflows/release.yml): Testing, packaging, GitHub releases, and platform SDK update PRs.
-- [SDK submodule update workflow](../.github/workflows/bump-sdk-submodule.yml): Updates the KMP reference in each platform SDK.
+- [SDK submodule update workflow](../.github/workflows/bump-sdk-submodule.yml): Updates the KMP reference in each platform SDK. For JS, rebuilds Core and refreshes `package-lock.json` with npm 10.9.0 before opening the PR. Android and iOS PRs change only the submodule reference; no SDK is automatically merged or released.
 - [JVM consumer project](../smoke-tests/maven-consumer): A separate test project that consumes the Maven artifact.
 - [Browser HTTP fixture](../karma.config.d/popup-loopback-fixture.js): Local test response middleware outside `scripts/`, used by `jsBrowserTest` to verify CORS, cookies, redirects, and cancellation.
