@@ -1,7 +1,6 @@
 package tech.notifly.kmp.core.networking
 
 import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
 
@@ -16,8 +15,10 @@ internal fun networkErrorCode(error: Exception): String =
 
         is HttpRequestTimeoutException,
         is ConnectTimeoutException,
-        is SocketTimeoutException,
         -> "client_timeout"
 
-        else -> "network_error"
+        else -> if (isSocketTimeout(error)) "client_timeout" else "network_error"
     }
+
+/** Identifies socket timeouts using the platform's compatible exception type. */
+internal expect fun isSocketTimeout(error: Exception): Boolean
