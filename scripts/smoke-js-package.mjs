@@ -45,6 +45,12 @@ try {
   assert.equal(decision.shouldMerge, true);
   assert.equal(decision.shouldClear, false);
 
+  const keyPolicy = sdk.tech.notifly.kmp.user.UserPropertyKeyPolicy;
+  assert.equal(keyPolicy.warningMessage(["user_name", "$email"]), null);
+  const propertyKeys = Object.freeze(["first.name", "valid_key"]);
+  assert.match(keyPolicy.warningMessage(propertyKeys), /\["first\.name"\]/);
+  assert.deepEqual(propertyKeys, ["first.name", "valid_key"]);
+
   const popup = sdk.tech.notifly.kmp.popup;
   const model = popup.model;
   const renderAndAwait = async (renderer, input, afterRender = () => {}) => {

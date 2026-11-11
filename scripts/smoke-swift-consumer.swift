@@ -39,6 +39,15 @@ private func renderAndAwait(
 
 precondition(UserIdTransitionPolicy.shared.evaluate(previousUserId: nil, newUserId: "A").shouldMerge)
 
+let validPropertyKeys = KotlinArray<NSString>(size: 2) { index in
+    ["user_name", "$email"][index.intValue] as NSString
+}
+precondition(UserPropertyKeyPolicy.shared.warningMessage(keys: validPropertyKeys) == nil)
+let invalidPropertyKeys = KotlinArray<NSString>(size: 2) { index in
+    ["first.name", "valid_key"][index.intValue] as NSString
+}
+precondition(UserPropertyKeyPolicy.shared.warningMessage(keys: invalidPropertyKeys)?.contains("[\"first.name\"]") == true)
+
 let staticRenderer = PopupFactory.shared.create(
     config: PopupRendererConfig(projectId: "", baseUrl: "not-https", sdkVersion: "")
 )
