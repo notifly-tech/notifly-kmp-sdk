@@ -9,14 +9,24 @@ import kotlin.js.JsExport
 /** Shared custom user property key policy, without logging or changing host SDK state. */
 @JsExport
 object UserPropertyKeyPolicy {
-    private val reservedKeys = setOf("\$email", "\$phone_number", "\$timezone", "\$line_user_id", "\$appsflyer_id")
+    private val reservedKeys =
+        setOf(
+            "\$email",
+            "\$phone_number",
+            "\$timezone",
+            "\$line_user_id",
+            "\$appsflyer_id",
+            "\$web_push_consent",
+            "\$web_push_consented_at",
+        )
 
     /**
      * Returns a warning for unsupported top-level [keys], or null when none need a warning.
      *
      * Custom keys must be nonempty and contain only ASCII letters, digits, or underscores.
-     * The exact reserved keys `$email`, `$phone_number`, `$timezone`, `$line_user_id`, and `$appsflyer_id`
-     * are exempt. Invalid keys are sorted and JSON-escaped; input order and contents are unchanged.
+     * The exact reserved keys `$email`, `$phone_number`, `$timezone`, `$line_user_id`, `$appsflyer_id`,
+     * `$web_push_consent`, and `$web_push_consented_at` are exempt. Invalid keys are sorted and JSON-escaped;
+     * input order and contents are unchanged.
      * Only keys are accepted: property values and nested objects are never inspected.
      *
      * Hosts call this after their existing timezone filtering and before dispatching the update.

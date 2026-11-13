@@ -22,7 +22,16 @@ class UserPropertyKeyPolicyTest {
 
     @Test
     fun warningMessage_exactReservedKeys_returnsNull() {
-        val keys = arrayOf("\$email", "\$phone_number", "\$timezone", "\$line_user_id", "\$appsflyer_id")
+        val keys =
+            arrayOf(
+                "\$email",
+                "\$phone_number",
+                "\$timezone",
+                "\$line_user_id",
+                "\$appsflyer_id",
+                "\$web_push_consent",
+                "\$web_push_consented_at",
+            )
 
         assertNull(UserPropertyKeyPolicy.warningMessage(keys))
     }
@@ -37,6 +46,7 @@ class UserPropertyKeyPolicyTest {
                 "사용자명",
                 "\$custom",
                 "\$EMAIL",
+                "\$WEB_PUSH_CONSENT",
                 "a^b",
                 "a-b",
                 "a/b",
