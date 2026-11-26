@@ -84,6 +84,43 @@ class SegmentEvaluatorTest {
     }
 
     @Test
+    fun evaluateSegment_unrenderedStaticOperand_returnsFalseBeforeNegation() {
+        val values = listOf("{{ broken", "{% broken")
+        val snapshot = context()
+
+        val actual =
+            values.map { value ->
+                val invalid = condition(operator = "<>", value = value)
+                evaluateSegment(compilePopupSegment(segment(group(invalid))), snapshot)
+            }
+
+        assertEquals(listOf(false, false), actual)
+    }
+
+    @Test
+    fun evaluateSegment_unrenderedOperand_invalidatesOnlyItsGroup() {
+        val broken = group(condition(operator = "<>", value = "{{ broken"))
+        val alternative = group(condition())
+        val prepared = compilePopupSegment(segment(broken, alternative))
+
+        val actual = evaluateSegment(prepared, context())
+
+        assertTrue(actual)
+    }
+
+    @Test
+    fun evaluateSegment_dynamicOperandWithLiquidCharacters_comparesTheEventValueLiterally() {
+        val wire = condition() + mapOf("useEventParamsAsConditionValue" to true, "comparison_parameter" to "item_id")
+        val prepared = compilePopupSegment(segment(group(wire)))
+        val user = AttributeSnapshot(mapOf("tier" to "{{ item"))
+        val event = EventSnapshot("buy", mapOf("item_id" to "{{ item"))
+
+        val actual = evaluateSegment(prepared, context(user, event))
+
+        assertTrue(actual)
+    }
+
+    @Test
     fun evaluateSegment_unavailableAttribute_cannotMatchExistenceOrNegation() {
         val snapshot = AttributeSnapshot(emptyMap(), unavailableKeys = setOf("tier"))
         val contexts = listOf(context(snapshot), context(null), context(AttributeSnapshot(emptyMap())))

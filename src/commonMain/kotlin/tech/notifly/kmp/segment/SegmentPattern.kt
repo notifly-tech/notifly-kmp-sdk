@@ -2,15 +2,24 @@ package tech.notifly.kmp.segment
 
 private const val MAX_PATTERN_LENGTH = 2048
 private const val MAX_GROUP_DEPTH = 64
-private const val MAX_REPEAT = 1000
-private const val MAX_STATES = 4096
+private const val MAX_STATES = 4_096
+private const val MAX_MATCH_STEPS = 1_500_000
 
 /** A bounded, flag-free pattern that searches UTF-16 code units in one forward pass. */
 internal class SegmentPattern private constructor(
     private val states: List<State>,
     private val start: Int,
+    private val requiredLiteral: Char?,
 ) {
-    fun matches(text: String): Boolean {
+    /** Returns null when the match budget is exhausted before a result is known. */
+    fun matches(text: String): Boolean? {
+        var remainingSteps = MAX_MATCH_STEPS
+        if (requiredLiteral != null && text.length <= remainingSteps) {
+            val firstOccurrence = text.indexOf(requiredLiteral)
+            if (firstOccurrence < 0) return false
+            remainingSteps -= firstOccurrence + 1
+        }
+
         val visited = IntArray(states.size) { -1 }
         val pending = IntArray(states.size)
         var active = mutableListOf<Int>()
@@ -20,7 +29,7 @@ internal class SegmentPattern private constructor(
             initial: Int,
             position: Int,
             result: MutableList<Int>,
-        ) {
+        ): Boolean {
             var size = 0
 
             fun enqueue(index: Int) {
@@ -31,6 +40,8 @@ internal class SegmentPattern private constructor(
 
             enqueue(initial)
             while (size > 0) {
+                if (remainingSteps == 0) return false
+                remainingSteps--
                 val index = pending[--size]
                 when (val state = states[index]) {
                     is State.Split -> {
@@ -55,15 +66,18 @@ internal class SegmentPattern private constructor(
                     }
                 }
             }
+            return true
         }
 
         for (position in 0..text.length) {
-            close(start, position, active)
+            if (!close(start, position, active)) return null
             if (visited[0] == position) return true
             if (position == text.length) break
             for (index in active) {
+                if (remainingSteps == 0) return null
+                remainingSteps--
                 val state = states[index] as State.Consume
-                if (state.test.matches(text[position])) close(state.next, position + 1, next)
+                if (state.test.matches(text[position]) && !close(state.next, position + 1, next)) return null
             }
             val previous = active
             active = next
@@ -80,7 +94,7 @@ internal class SegmentPattern private constructor(
                 val expression = PatternParser(pattern).parse()
                 val builder = StateBuilder()
                 val start = builder.emit(expression, 0)
-                SegmentPattern(builder.states.toList(), start)
+                SegmentPattern(builder.states.toList(), start, expression.requiredLiteral())
             } catch (_: InvalidPattern) {
                 null
             }
@@ -133,6 +147,15 @@ private sealed interface Expression {
         val maximum: Int?,
     ) : Expression
 }
+
+/** Finds a code unit that every match must contain, when the syntax proves one is required. */
+private fun Expression.requiredLiteral(): Char? =
+    when (this) {
+        is Expression.Take -> (test as? CharTest.Literal)?.value
+        is Expression.Sequence -> parts.asReversed().firstNotNullOfOrNull { it.requiredLiteral() }
+        is Expression.Repeat -> if (minimum > 0) body.requiredLiteral() else null
+        else -> null
+    }
 
 private sealed interface CharTest {
     val intervals: List<IntRange>
@@ -320,14 +343,9 @@ private class PatternParser(
     }
 
     private fun repeatCount(): Int {
-        var result = 0
         val start = offset
-        while (peek()?.let { it in '0'..'9' } == true) {
-            result = result * 10 + (next() - '0')
-            if (result > MAX_REPEAT) throw InvalidPattern()
-        }
-        if (start == offset) throw InvalidPattern()
-        return result
+        while (peek()?.let { it in '0'..'9' } == true) offset++
+        return pattern.substring(start, offset).toIntOrNull() ?: throw InvalidPattern()
     }
 
     private fun characterClass(): CharTest {

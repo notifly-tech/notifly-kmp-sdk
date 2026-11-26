@@ -319,7 +319,7 @@ class ComparisonTest {
 
     @Test
     fun match_invalidRegex_returnsFalseBeforeNegating() {
-        val invalid = listOf("[", "(?<=a)b", "(?=a)", "(a)\\1", "(?i:a)", "a{1001}", "a++", "[z-a]")
+        val invalid = listOf("[", "(?<=a)b", "(?=a)", "(a)\\1", "(?i:a)", "a++", "[z-a]")
 
         invalid.forEach { pattern ->
             val actual =
@@ -372,6 +372,50 @@ class ComparisonTest {
         val actual = cases.map { (source, pattern) -> match("matches_regex", "TEXT", source, pattern) }
 
         assertEquals(cases.map { it.third }, actual)
+    }
+
+    @Test
+    fun match_regexRepeatRangeBeyondThousand_acceptsValidMatches() {
+        val source = "a".repeat(1_001)
+        val cases = listOf(source to "^a{1001,1002}$", (source + "b") to "a{1001,1002}b")
+
+        cases.forEach { (text, pattern) ->
+            val actual = match("matches_regex", "TEXT", text, pattern)
+
+            assertTrue(actual, pattern)
+        }
+    }
+
+    @Test
+    fun match_regexCompilerLimit_returnsFalseBeforeNegation() {
+        val source = "a".repeat(4_096)
+        val pattern = "a{4096}"
+
+        val positive = match("matches_regex", "TEXT", source, pattern)
+        val negative = match("does_not_match_regex", "TEXT", source, pattern)
+
+        assertEquals(false to false, positive to negative)
+    }
+
+    @Test
+    fun match_regexExecutionLimit_returnsFalseBeforeNegation() {
+        val source = "b" + "a".repeat(10_000)
+        val pattern = "a{1000}b"
+
+        val positive = match("matches_regex", "TEXT", source, pattern)
+        val negative = match("does_not_match_regex", "TEXT", source, pattern)
+
+        assertEquals(false to false, positive to negative)
+    }
+
+    @Test
+    fun match_regexMissingRequiredLiteral_canStillProveANonMatch() {
+        val source = "a".repeat(10_000)
+        val pattern = "a{1000}b"
+
+        val actual = match("does_not_match_regex", "TEXT", source, pattern)
+
+        assertTrue(actual)
     }
 
     @Test

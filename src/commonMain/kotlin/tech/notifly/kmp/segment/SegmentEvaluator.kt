@@ -12,6 +12,9 @@ import tech.notifly.kmp.segment.model.PreparedSegment
  *
  * [wire] must contain a `groups` list. An otherwise valid segment with an empty list matches all contexts.
  * A missing or malformed list matches none. An invalid condition or group does not affect other OR groups.
+ * Static operands with unresolved Liquid delimiters are invalid. Event operands are compared as supplied.
+ *
+ * Regular expressions use the shared subset and limits described in [compileEventPredicates].
  */
 fun compilePopupSegment(wire: Map<String, Any?>?): PreparedSegment {
     val groups = wire?.get("groups") as? List<*> ?: return PreparedSegment(null)
@@ -39,7 +42,15 @@ fun evaluateSegment(
     return groups.isEmpty() || anyMatchingGroup(groups) { it.matches(context) }
 }
 
-/** Prepares the name and parameter groups for a single trigger or cancellation rule. */
+/**
+ * Prepares the name and parameter groups for a single trigger or cancellation rule.
+ *
+ * Patterns use case-sensitive partial matching over UTF-16 code units. The parser permits at most 2,048
+ * pattern code units and 64 nested groups. Repetition counts must fit a nonnegative Int and the compiled
+ * program must fit 4,096 states and 16,384 compiler steps. A match has a work budget of 1,500,000 steps,
+ * including code units inspected by the literal check and state visits and transitions. Conditions with an
+ * unsupported pattern or an exhausted match budget evaluate to false for both regex operators.
+ */
 fun compileEventPredicates(wire: EventPredicateInput): PreparedEventPredicates {
     val names =
         if (wire.nameConditions == null) {
@@ -162,11 +173,14 @@ private fun compileSegmentCondition(wire: Map<*, *>): SegmentCondition? {
                 else -> return null
             }
         }
+    val value = wire["value"]
+    if (!exists && parameter == null && value is String && ("{{" in value || "{%" in value)) return null
+
     val comparison =
         compileComparison(
             operator,
             type,
-            wire["value"],
+            value,
             dynamicTarget = parameter != null,
             version = scope == AttributeScope.DEVICE && attribute in deviceVersions,
         ) ?: return null

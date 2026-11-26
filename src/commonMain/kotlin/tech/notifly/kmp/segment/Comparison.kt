@@ -154,7 +154,7 @@ internal class Comparison private constructor(
         if (operation == Operation.PRESENT) return (source != null) != operator.negated
         val kind = kind ?: return false
         val target = staticTarget ?: prepareTarget(dynamicValue, kind, operation, comparesVersions) ?: return false
-        val positive = positiveMatch(operation, kind, source, target)
+        val positive = positiveMatch(operation, kind, source, target) ?: return false
         return positive != operator.negated
     }
 
@@ -163,7 +163,7 @@ internal class Comparison private constructor(
         kind: ValueKind,
         source: Any?,
         target: Target,
-    ): Boolean {
+    ): Boolean? {
         if (operation == Operation.INCLUDES) {
             return (source as? List<*>)?.any { kind.convert(it) == target.value } == true
         }
@@ -199,7 +199,7 @@ internal class Comparison private constructor(
             }
 
             Operation.REGEX -> {
-                target.pattern?.matches(left as String) == true
+                target.pattern?.matches(left as String)
             }
 
             else -> {
